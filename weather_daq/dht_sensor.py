@@ -1,10 +1,11 @@
 import adafruit_dht
 import board
+from adafruit_blinka.microcontroller.bcm283x import pin
 
 
 class DHTSensor:
-    def __init__(self, pin):
-        self.dht = adafruit_dht.DHT22(pin)
+    def __init__(self, dht_pin: pin):
+        self.dht = adafruit_dht.DHT22(dht_pin)
 
     def read_temp(self):
         try:
