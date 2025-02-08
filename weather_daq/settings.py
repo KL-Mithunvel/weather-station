@@ -1,11 +1,13 @@
 import board
 
+ACQUIRE_INTERVAL = 6    # seconds
 
 DB_SETTINGS = {
     'DB_HOST': "",
     'DB_USER': "",
     'DB_PASSWD': "",
     'DB_NAME': "",
+    'DB_FILE_NAME':'/home/klm/weather/data/weather_data.db'
 }
 
 DHT_PIN = board.D4

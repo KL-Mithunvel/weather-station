@@ -20,7 +20,7 @@ def acquire_loop():
         rec.wind_speed = wind.wind_speed
         rec.cpu_temp = cpu.read_cpu_temp()
         db.write_record(rec)
-        time.sleep(60)
+        time.sleep(settings.ACQUIRE_INTERVAL)
 
 
 dht:dht_sensor.DHTSensor = dht_sensor.DHTSensor(dht_pin=settings.DHT_PIN)
@@ -30,4 +30,9 @@ rain:rain_sensor.RainSensor = rain_sensor.RainSensor(rain_pin=settings.RAIN_PIN)
 cpu: pi_cpu_temp.PiBoard = pi_cpu_temp.PiBoard()
 db: db_api.WeatherDB = db_api.WeatherDB(settings.DB_SETTINGS)
 
-acquire_loop()
+try:
+    acquire_loop()
+except (RuntimeError, OSError, ValueError) as e:
+    db.close()
+    dht.close()
+    print(e)
