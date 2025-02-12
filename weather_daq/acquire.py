@@ -14,8 +14,7 @@ def acquire_loop():
     while run:
         rec = db_api.WeatherRecord()
         rec.timestamp = datetime.now()
-        rec.temp = dht.read_temp()
-        rec.rh = dht.read_humidity()
+        rec.temp, rec.rh = dht.read_values()
         rec.wind_dir = wind.wind_dir
         rec.wind_speed = wind.wind_speed
         rec.cpu_temp = cpu.read_cpu_temp()
@@ -33,6 +32,9 @@ db: db_api.WeatherDB = db_api.WeatherDB(settings.DB_SETTINGS)
 try:
     acquire_loop()
 except (RuntimeError, OSError, ValueError) as e:
-    db.close()
-    dht.close()
-    print(e)
+    try:
+        db.close()
+        dht.close()
+    except Exception:
+        pass
+    # print(e)

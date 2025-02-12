@@ -1,6 +1,6 @@
 import board
 
-ACQUIRE_INTERVAL = 6    # seconds
+ACQUIRE_INTERVAL = 60    # seconds
 
 DB_SETTINGS = {
     'DB_HOST': "",

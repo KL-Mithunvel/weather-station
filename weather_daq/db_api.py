@@ -31,6 +31,22 @@ class WeatherDB:
                     rain_qty REAL
                 )
             """)
+            self.connection.execute("""
+                CREATE TABLE IF NOT EXISTS weather_summary (
+                    date DATE,
+                    min_temp REAL,
+                    max_temp REAL,
+                    avg_temp REAL,
+                    min_rh REAL,
+                    max_rh REAL,
+                    avg_rh REAL,
+                    max_speed REAL,
+                    avg_wind_speed REAL,
+                    avg_wind_dir INTEGER,
+                    total_rain_qty REAL
+                )
+            """)
+
 
     def write_record(self, weather_record):
         if not self.connection:
@@ -42,6 +58,28 @@ class WeatherDB:
             """, (weather_record.timestamp, weather_record.temp, weather_record.rh, weather_record.cpu_temp,
                   weather_record.wind_speed, weather_record.wind_dir, weather_record.rain_qty))
             print(weather_record)
+
+    def get_daily_summary(self,dt):
+        calc_query = """
+                SELECT
+                    MIN(temp) AS min_temp,
+                    MAX(temp) AS max_temp,
+                    AVG(temp) AS avg_temp,
+                    MIN(rh)   AS min_rh,
+                    MAX(rh)   AS max_rh,
+                    AVG(rh)   AS avg_rh,
+                    MAX(wind_speed)       AS max_speed,
+                    AVG(wind_speed)       AS avg_wind_speed,
+                    AVG(wind_dir)         AS avg_wind_dir,
+                    SUM(rain_qty)         AS total_rain_qty
+                FROM weather
+                WHERE DATE(timestamp) = ?
+            """
+
+        cur = self.connection.cursor()
+        cur.execute(calc_query, (dt,))
+        stats = cur.fetchone()
+        return stats
 
     def check_connection(self):
         if not self.connection:
@@ -59,11 +97,19 @@ class WeatherDB:
         cursor.execute("SELECT id, timestamp, temp, rh, cpu_temp, wind_speed, wind_dir, rain_qty FROM weather")
         return cursor.fetchall()
 
-    def get_last_record(self):
+    def get_records_by_date(self, dt):
         self.check_connection()
+        csql = "SELECT * FROM weather WHERE DATE(timestamp) = '{}'".format(dt);
 
         cursor = self.connection.cursor()
-        cursor.execute("SELECT id, timestamp, temp, rh, cpu_temp, wind_speed, wind_dir, rain_qty FROM weather ORDER BY id DESC LIMIT 1 ")
+        cursor.execute(csql)
+        return cursor.fetchall()
+
+    def get_last_record(self):
+        self.check_connection()
+        csql = "SELECT id, timestamp, temp, rh, cpu_temp, wind_speed, wind_dir, rain_qty FROM weather ORDER BY id DESC LIMIT 1 "
+        cursor = self.connection.cursor()
+        cursor.execute(csql)
         return cursor.fetchall()
 
     def close(self):
