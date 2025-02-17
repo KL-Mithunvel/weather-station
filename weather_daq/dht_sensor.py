@@ -1,9 +1,9 @@
 import adafruit_dht
 import board
 from adafruit_blinka.microcontroller.bcm283x import pin
-import sysv_ipc
+import time
 
-RETRY_COUNT = 3
+import settings
 
 
 class DHTSensor:
@@ -11,53 +11,58 @@ class DHTSensor:
         self.is_faulty = False
         self.dht = None
         self.dht_pin = dht_pin
+        self.open()
+        self.readings = []
+
+    def __del__(self):
+        self.close()
 
     def open(self):
         self.dht = adafruit_dht.DHT22(self.dht_pin)
-
-    def read_values(self):
-        count = RETRY_COUNT
-        while count > 0:
-            self.open()
-            try:
-                t = self.dht.temperature
-                h = self.dht.humidity
-                self.close()
-                return t, h
-            except (RuntimeError, ValueError, OSError) as e:
-                self.is_faulty = True
-                count -= 1
-        return None
-
-    def read_temp(self):
-        count = RETRY_COUNT
-        while count > 0:
-            self.open()
-            try:
-                t = self.dht.temperature
-                self.close()
-                return t
-            except (RuntimeError, ValueError, OSError) as e:
-                self.is_faulty = True
-                count -= 1
-        return None
-
-    def read_humidity(self):
-        count = RETRY_COUNT
-        while count > 0:
-            self.open()
-            try:
-                h = self.dht.humidity
-                self.close()
-                return h
-            except RuntimeError:
-                self.is_faulty = True
-                count -= 1
-        return None
+        time.sleep(1)
 
     def close(self):
         if self.dht:
-            self.dht.exit()
+            try:
+                self.dht.exit()
+            except (Exception):
+                pass
+
+    def read_values(self):
+        count = settings.DHT_RETRY_COUNT
+        while count > 0:
+            try:
+                t = self.dht.temperature
+                h = self.dht.humidity
+                self.is_faulty = False
+                self.add_readings_to_buffer(t, h)
+                return t, h
+            except (Exception) as e:
+                self.is_faulty = True
+                count -= 1
+                print(
+                    f'DHT22 sensor exception, retrying... ({count} retries left)'
+                )
+                time.sleep(settings.DHT_RECOVERY_INTERVAL)
+        return None, None
+
+
+    def add_readings_to_buffer(self, temp, rh):
+        self.readings.append([temp, rh])
+        if len(self.readings) > settings.DHT_READINGS_BUFFER_SIZE:
+            self.readings.pop(0)
+
+    def readings_are_repeating(self):
+        if len(self.readings) < settings.DHT_READINGS_BUFFER_SIZE:
+            return False
+        if len(set([x[0] for x in self.readings])) == 1 and len(set([x[1] for x in self.readings])) == 1:
+            return True
+        return False
+
+    def recover_sensor(self):
+        self.close()
+        time.sleep(settings.DHT_RECOVERY_INTERVAL * 2)
+        self.open()
 
 
 if __name__ == "__main__":

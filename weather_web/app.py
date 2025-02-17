@@ -89,8 +89,14 @@ def index(date_str=None):
 @app.route("/")
 def home():
     weather_db = db_api.WeatherDB(web_settings.DB_SETTINGS)
-    cur_weather = weather_db.get_last_record()
-
+    cur_weather = weather_db.get_last_record()[0]
+    last_reading = cur_weather[1]
+    cur_temp = cur_weather[2]
+    cur_rh = cur_weather[3]
+    cur_cpu_temp = cur_weather[4]
+    cur_wind_speed = cur_weather[5]
+    cur_wind_dir = cur_weather[6]
+    cur_rain_qty = cur_weather[7]
     return f"""
     <html>
     <head>
@@ -98,7 +104,15 @@ def home():
     </head>
     <body>
         <h1>Current Weather Data</h1>
-        {cur_weather}
+        <table border='1' cellpadding='5' cellspacing='0'>
+            <tr><td>Last Reading</td><td>{last_reading}</td><td>Min</td><td>Max</td><td>Avg</td></tr>
+            <tr><td>Temperature</td><td>{cur_temp} oC</td></tr>
+            <tr><td>Humidity</td><td>{cur_rh}% RH</td></tr>
+            <tr><td>CPU Temp</td><td>{cur_cpu_temp} oC</td></tr>
+            <tr><td>Wind Speed</td><td>{cur_wind_speed}</td></tr>
+            <tr><td>Wind Dir</td><td>{cur_wind_dir}</td></tr>
+            <tr><td>Rain Qty</td><td>{cur_rain_qty}</td></tr>
+        </table>
     </body>
     </html>
     """

@@ -9,17 +9,30 @@ import rain_sensor
 import settings
 
 
+def clean_up():
+    try:
+        db.close()
+        dht.close()
+    except Exception:
+        pass
+
+
 def acquire_loop():
     run = True
+
     while run:
         rec = db_api.WeatherRecord()
-        rec.timestamp = datetime.now()
+        rec.timestamp = datetime.now().replace(microsecond=0)
         rec.temp, rec.rh = dht.read_values()
         rec.wind_dir = wind.wind_dir
         rec.wind_speed = wind.wind_speed
         rec.cpu_temp = cpu.read_cpu_temp()
         db.write_record(rec)
+
         time.sleep(settings.ACQUIRE_INTERVAL)
+
+        if dht.is_faulty or dht.readings_are_repeating():
+            dht.recover_sensor()
 
 
 dht:dht_sensor.DHTSensor = dht_sensor.DHTSensor(dht_pin=settings.DHT_PIN)
@@ -31,10 +44,5 @@ db: db_api.WeatherDB = db_api.WeatherDB(settings.DB_SETTINGS)
 
 try:
     acquire_loop()
-except (RuntimeError, OSError, ValueError) as e:
-    try:
-        db.close()
-        dht.close()
-    except Exception:
-        pass
-    # print(e)
+except (Exception) as e:
+    clean_up()

@@ -48,14 +48,15 @@ class WeatherDB:
             """)
 
 
-    def write_record(self, weather_record):
+    def write_record(self, weather_record: WeatherRecord):
         if not self.connection:
             raise RuntimeError("Database connection not established")
         with self.connection:
-            self.connection.execute("""
+            csql = """
                 INSERT INTO weather (timestamp, temp, rh, cpu_temp, wind_speed, wind_dir, rain_qty)
                 VALUES (?, ?, ?, ?, ?, ?, ?)
-            """, (weather_record.timestamp, weather_record.temp, weather_record.rh, weather_record.cpu_temp,
+            """
+            self.connection.execute(csql, (weather_record.timestamp, weather_record.temp, weather_record.rh, weather_record.cpu_temp,
                   weather_record.wind_speed, weather_record.wind_dir, weather_record.rain_qty))
             print(weather_record)
 
