@@ -72,7 +72,10 @@ class WeatherDB:
                     MAX(wind_speed)       AS max_speed,
                     AVG(wind_speed)       AS avg_wind_speed,
                     AVG(wind_dir)         AS avg_wind_dir,
-                    SUM(rain_qty)         AS total_rain_qty
+                    SUM(rain_qty)         AS total_rain_qty,
+                    MIN(cpu_temp) AS min_cpu_temp,
+                    MAX(cpu_temp) AS max_cpu_temp,
+                    AVG(cpu_temp) AS avg_cpu_temp
                 FROM weather
                 WHERE DATE(timestamp) = ?
             """
@@ -80,7 +83,16 @@ class WeatherDB:
         cur = self.connection.cursor()
         cur.execute(calc_query, (dt,))
         stats = cur.fetchone()
-        return stats
+        d = {
+                "date": dt ,
+                "temp": {"min": stats[0], "max": stats[1], "avg": round(stats[2],1)},
+                "rh":   {"min": stats[3], "max": stats[4], "avg": round(stats[5],1)},
+                "wind_speed": {"max": stats[6], "avg": round(stats[7],1)},
+                "wind_dir": {"avg": round(stats[8],0)},
+                "rain": {"total": stats[9]},
+                "cpu_temp": {"min": stats[10], "max": stats[11], "avg": round(stats[12],1)},
+            }
+        return d
 
     def check_connection(self):
         if not self.connection:

@@ -4,6 +4,7 @@ from adafruit_blinka.microcontroller.bcm283x import pin
 import time
 
 import settings
+import daq_log
 
 
 class DHTSensor:
@@ -19,6 +20,7 @@ class DHTSensor:
 
     def open(self):
         self.dht = adafruit_dht.DHT22(self.dht_pin)
+        daq_log.logger.info('DHT22 sensor opened')
         time.sleep(1)
 
     def close(self):
