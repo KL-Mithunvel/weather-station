@@ -4,7 +4,7 @@ from adafruit_blinka.microcontroller.bcm283x import pin
 import time
 
 import settings
-import daq_log
+from daq_log import logger
 
 
 class DHTSensor:
@@ -20,7 +20,7 @@ class DHTSensor:
 
     def open(self):
         self.dht = adafruit_dht.DHT22(self.dht_pin)
-        daq_log.logger.info('DHT22 sensor opened')
+        logger.info('DHT22 sensor opened on pin {}'.format(self.dht_pin))
         time.sleep(1)
 
     def close(self):
@@ -42,7 +42,7 @@ class DHTSensor:
             except (Exception) as e:
                 self.is_faulty = True
                 count -= 1
-                print(
+                logger.error(
                     f'DHT22 sensor exception, retrying... ({count} retries left)'
                 )
                 time.sleep(settings.DHT_RECOVERY_INTERVAL)
@@ -58,6 +58,7 @@ class DHTSensor:
         if len(self.readings) < settings.DHT_READINGS_BUFFER_SIZE:
             return False
         if len(set([x[0] for x in self.readings])) == 1 and len(set([x[1] for x in self.readings])) == 1:
+            logger.debug("Readings are repeating.")
             return True
         return False
 

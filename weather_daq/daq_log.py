@@ -3,7 +3,7 @@ import logging.handlers
 import os
 
 
-LOG_DIR = '/var/log/weather/'
+LOG_DIR = '/var/log/weather'
 LOG_FILE_NAME = 'weather_daq.log'
 os.makedirs(LOG_DIR, exist_ok=True)
 log_path = os.path.join(LOG_DIR, LOG_FILE_NAME)
