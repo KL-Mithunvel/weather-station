@@ -25,6 +25,9 @@ while True:
 s.exit()
 
 ```
+### for full code refer GitHub Repository:
+[GitHub Repository Link](#) *https://github.com/KL-Mithunvel/weather-station*
+
 ### Requireements:
 ```txt
 Adafruit-Blinka==8.54.0
@@ -78,54 +81,48 @@ output:
 
 ## 3. Correlation Analysis
 ```r
-# Compute correlation matrix
-correlation_matrix <- cor(weather_data[, c("temp", "humidity", "cpu_temp")])
-print(correlation_matrix)
+v1= var(data$temp, use = "complete.obs")
+v1
+v2=var(data$humidity, use = "complete.obs")
+v2
+v3=var(data$'cpu temp', use = "complete.obs")
+v3
 
-# Visualizing correlation using a heatmap
-library(ggcorrplot)
-ggcorrplot(correlation_matrix, lab = TRUE)
+corr13=cor(data$temp, data$`cpu temp`, use = "complete.obs")
+corr13
+
+corr12=cor(data$temp, data$humidity, use = "complete.obs")
+corr12
+
+corr23=cor(data$humidity, data$'cpu temp', use = "complete.obs")
+corr23
 ```
+output:
+![image](https://github.com/user-attachments/assets/a9faf631-5d50-4b31-86f8-af84afaf52a1)
 
 ## 4. Regression Analysis (Two or More Variables)
-### Simple Linear Regression
 ```r
-# Predict CPU temperature based on atmospheric temperature
-model1 <- lm(cpu_temp ~ temp, data=weather_data)
-summary(model1)
+
+data= weather_2025_02_18
+data
+#regression b/w temp, humidity and cpu temp
+x=data$temp
+x
+y= data$humidity
+y
+z= data$`cpu temp`
+z
+r=lm(z~x+y)
+r
+summary(r)
+
+library(scatterplot3d)
+g=scatterplot3d(x,y,z)
+g$plane(r)
+
 ```
-
-### Multiple Linear Regression
-```r
-# Predict CPU temperature based on temperature and humidity
-model2 <- lm(cpu_temp ~ temp + humidity, data=weather_data)
-summary(model2)
-```
-
-## 5. Regression Visualization
-```r
-# Scatter plot with regression line
-ggplot(weather_data, aes(x=temp, y=cpu_temp)) +
-    geom_point() +
-    geom_smooth(method="lm", col="blue") +
-    labs(title="Regression of CPU Temp vs Atmospheric Temp", x="Temperature (°C)", y="CPU Temperature (°C)")
-```
-
-## 6. Model Diagnostics
-```r
-# Check Residuals
-par(mfrow=c(2,2))
-plot(model2)
-```
-
-## 7. Conclusion
-- Correlation analysis helps understand the relationship between atmospheric temperature, humidity, and CPU temperature.
-- Regression models allow us to predict CPU temperature based on environmental factors.
-- Multiple regression improves prediction accuracy by including additional variables.
-
-**This analysis provides insights into how weather conditions impact CPU temperature.**
+output:
+![image](https://github.com/user-attachments/assets/ac6f7537-6115-4873-b920-7a86146c55fe)
+![image](https://github.com/user-attachments/assets/e66d5ec7-9ee2-4b97-ac1a-f50ecf7db4a6)
 
 ---
-
-## 8. GitHub Repository
-[GitHub Repository Link](#) *https://github.com/KL-Mithunvel/weather-station*
