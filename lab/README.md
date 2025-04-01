@@ -126,3 +126,47 @@ output:
 ![image](https://github.com/user-attachments/assets/e66d5ec7-9ee2-4b97-ac1a-f50ecf7db4a6)
 
 ---
+# One-Sample z-Test Report
+##  Performing a One-Sample z-Test
+This document demonstrates how to compute basic statistics and perform a **one-sample z-test** on a column of data in R.
+
+
+```r
+# Sample standard deviation of 'temp' (ignoring NA)
+standard_dev = sd(data$temp, na.rm = TRUE)
+standard_dev  # e.g. 3.621358
+
+# Sample mean of 'temp' (ignoring NA)
+mean_value = mean(data$temp, na.rm = TRUE)
+mean_value  # e.g. 28.65497
+
+z.test(
+  x = data$temp,   # the sample data
+  mu = 25,         # hypothesized mean
+  sigma.x = 2,     # population standard deviation (assumed known)
+  alternative = "two.sided",
+  conf.level = 0.95
+)
+```
+`na.rm = TRUE` ensures that missing values (`NA`) are ignored during computation.
+
+### Understanding the Parameters
+- **`x = data$temp`**: The sample data under test.
+- **`mu = 25`**: The null hypothesis states that the true mean is 25.
+- **`sigma.x = 2`**: The population standard deviation is assumed to be 2 (instead of using the sample’s 3.62).
+- **`alternative = "two.sided"`**: Checks if mean ≠ 25.
+- **`conf.level = 0.95`**: We want a 95% confidence interval.
+
+### Output
+![image](https://github.com/user-attachments/assets/362f8f07-eace-4548-b6a1-414fc9f11cf0)
+
+
+#### Interpretation
+1. **z = 67.814**: The test statistic is extremely large, indicating the sample mean is far from the hypothesized mean of 25.
+2. **p-value < 2.2e-16**: Essentially zero, suggesting that observing a mean of ~28.65 (or more extreme) is virtually impossible under H₀.
+3. **95% Confidence Interval**: [28.54934, 28.76061]. We’re 95% confident the true mean lies in this range.
+4. **Sample estimate**: 28.65497, confirming the computed mean.
+
+### Conclusion
+- Since `p-value << 0.05`, we **reject** the null hypothesis that the true mean is 25.
+- The data strongly suggests that the **true mean** of `temp` is around **28.65**—significantly higher than 25.
