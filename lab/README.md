@@ -187,18 +187,17 @@ This document provides two sample hypothesis tests you can run on your weather d
 
 ### Sample R Code
 ```r
-# Suppose 'weather_data' is your dataset, and 'humidity' is the column
 
 # 1) Check the sample mean
-mean_humidity <- mean(weather_data$humidity, na.rm = TRUE)
+mean_humidity = mean(data$humidity, na.rm = TRUE)
 cat("Sample mean humidity:", mean_humidity, "\n")
 
 # 2) Perform a one-sample t-test comparing mean humidity to 50%
 # (You can also do a z-test if population SD is known)
 
-test_result <- t.test(
-  x = weather_data$humidity,
-  mu = 50,              # hypothesized mean humidity
+test_result = t.test(
+  x = data$humidity,
+  mu = 50,              
   alternative = "two.sided",
   conf.level = 0.95
 )
@@ -213,6 +212,9 @@ print(test_result)
    - **p-value** < 0.05 ⇒ reject H₀ (humidity differs significantly from 50%).
    - **p-value** ≥ 0.05 ⇒ fail to reject H₀ (no evidence to say humidity differs from 50%).
 4. **Confidence Interval**: Tells you the plausible range for the population mean humidity.
+
+### output
+![image](https://github.com/user-attachments/assets/f532371a-5251-44ac-8566-8ce508d762b4)
 
 ---
 ## ii. Compare Indoor (CPU Temp) vs. Outdoor (temp) Variation
@@ -244,6 +246,8 @@ paired_test <- t.test(
 
 print(paired_test)
 ```
+## output 
+![image](https://github.com/user-attachments/assets/37b79103-ef8d-42fb-b1a4-0e00578d02e0)
 
 ### Explanation
 1. **`t.test(..., paired = TRUE)`**: A **paired t-test** checks if two related measurements (CPU and outdoor temperatures) differ on average.
