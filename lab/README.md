@@ -228,17 +228,17 @@ Often, these measurements can be viewed as "paired" if each CPU temp reading cor
 ### Sample R Code
 ```r
 # 1) Check sample means
-mean_cpu   <- mean(weather_data$cpu_temp, na.rm = TRUE)
-mean_out   <- mean(weather_data$temp, na.rm = TRUE)
+mean_cpu   = mean(data$cpu_temp, na.rm = TRUE)
+mean_out   = mean(data$temp, na.rm = TRUE)
 cat("Mean CPU Temp:", mean_cpu, "\n")
 cat("Mean Outdoor Temp:", mean_out, "\n")
 
 # 2) Paired t-test
 # Assuming each row in 'weather_data' is a simultaneous measurement.
 
-paired_test <- t.test(
-  x = weather_data$cpu_temp,
-  y = weather_data$temp,
+paired_test = t.test(
+  x = data$'cpu temp',
+  y = data$temp,
   paired = TRUE,              # indicates matched pairs
   alternative = "two.sided",
   conf.level = 0.95
