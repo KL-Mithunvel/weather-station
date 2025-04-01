@@ -126,8 +126,8 @@ output:
 ![image](https://github.com/user-attachments/assets/e66d5ec7-9ee2-4b97-ac1a-f50ecf7db4a6)
 
 ---
-# One-Sample z-Test Report
-##  Performing a One-Sample z-Test
+# 5. One-Sample z-Test Report
+ Performing a One-Sample z-Test
 This document demonstrates how to compute basic statistics and perform a **one-sample z-test** on a column of data in R.
 
 
@@ -170,3 +170,86 @@ z.test(
 ### Conclusion
 - Since `p-value << 0.05`, we **reject** the null hypothesis that the true mean is 25.
 - The data strongly suggests that the **true mean** of `temp` is around **28.65**—significantly higher than 25.
+
+# Additional Hypothesis Testing Examples
+
+This document provides two sample hypothesis tests you can run on your weather dataset:
+
+1. **Hypothesis on Mean Humidity vs. Threshold**
+2. **Comparing Indoor (CPU Temp) vs. Outdoor (temp) Variation**
+
+---
+## i. Hypothesis on Mean Humidity vs. Threshold
+
+### Problem Statement
+- **Null Hypothesis (H₀)**: The mean humidity is **50%** (or some chosen threshold).
+- **Alternative Hypothesis (H₁)**: The mean humidity **≠ 50%**.
+
+### Sample R Code
+```r
+# Suppose 'weather_data' is your dataset, and 'humidity' is the column
+
+# 1) Check the sample mean
+mean_humidity <- mean(weather_data$humidity, na.rm = TRUE)
+cat("Sample mean humidity:", mean_humidity, "\n")
+
+# 2) Perform a one-sample t-test comparing mean humidity to 50%
+# (You can also do a z-test if population SD is known)
+
+test_result <- t.test(
+  x = weather_data$humidity,
+  mu = 50,              # hypothesized mean humidity
+  alternative = "two.sided",
+  conf.level = 0.95
+)
+
+print(test_result)
+```
+
+### Explanation
+1. **`mean(weather_data$humidity, na.rm = TRUE)`**: This finds your **sample mean**.
+2. **`t.test(..., mu = 50)`**: Conducts a **one-sample t-test** to see if the true mean is different from 50.
+3. **Interpretation**:
+   - **p-value** < 0.05 ⇒ reject H₀ (humidity differs significantly from 50%).
+   - **p-value** ≥ 0.05 ⇒ fail to reject H₀ (no evidence to say humidity differs from 50%).
+4. **Confidence Interval**: Tells you the plausible range for the population mean humidity.
+
+---
+## ii. Compare Indoor (CPU Temp) vs. Outdoor (temp) Variation
+
+### Problem Statement
+- **Null Hypothesis (H₀)**: The mean CPU temperature = the mean outdoor temperature.
+- **Alternative Hypothesis (H₁)**: The mean CPU temperature ≠ the mean outdoor temperature.
+
+Often, these measurements can be viewed as "paired" if each CPU temp reading corresponds to the same timestamp as the outdoor temp reading.
+
+### Sample R Code
+```r
+# 1) Check sample means
+mean_cpu   <- mean(weather_data$cpu_temp, na.rm = TRUE)
+mean_out   <- mean(weather_data$temp, na.rm = TRUE)
+cat("Mean CPU Temp:", mean_cpu, "\n")
+cat("Mean Outdoor Temp:", mean_out, "\n")
+
+# 2) Paired t-test
+# Assuming each row in 'weather_data' is a simultaneous measurement.
+
+paired_test <- t.test(
+  x = weather_data$cpu_temp,
+  y = weather_data$temp,
+  paired = TRUE,              # indicates matched pairs
+  alternative = "two.sided",
+  conf.level = 0.95
+)
+
+print(paired_test)
+```
+
+### Explanation
+1. **`t.test(..., paired = TRUE)`**: A **paired t-test** checks if two related measurements (CPU and outdoor temperatures) differ on average.
+2. **p-value** < 0.05 ⇒ reject H₀ (there’s a significant difference between CPU temp and outdoor temp).
+3. **p-value** ≥ 0.05 ⇒ fail to reject H₀ (no significant difference found).
+4. You’ll also get a **95% confidence interval** for the mean difference (CPU temp – outdoor temp). If it excludes 0, it indicates a significant difference.
+
+---
+
