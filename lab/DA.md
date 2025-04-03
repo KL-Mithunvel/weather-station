@@ -175,7 +175,7 @@ OUTPUT:
 ### (ii) Estimate the cooking time when the oven width is 15.8 and fuel temperature is 52.4. 
 ### (iii) Plot the given data by visualizing 𝑦. 
 
-OUTPUT:
+ 
 ```r
 #(i) 
 y = c(6.4, 15.05, 18.75, 30.25, 44.85, 48.94, 51.55, 61.5, 100.44, 111.42, 115.23, 120.54)
@@ -194,6 +194,7 @@ predicted_y
 scatterplot3d(x1, x2, y, color = "blue", main = "3D Scatter Plot of Cooking Time", xlab = "Oven Width (x1)", ylab = "Fuel Temperature (x2)", zlab = "Cooking Time (y)")
 
 ```
+OUTPUT:
 ```r
 > #(i) 
 > y = c(6.4, 15.05, 18.75, 30.25, 44.85, 48.94, 51.55, 61.5, 100.44, 111.42, 115.23, 120.54)
@@ -240,10 +241,117 @@ F-statistic: 514.8 on 2 and 9 DF,  p-value: 5.25e-10
 
 ### 4)	A sample of heights of 6400 Englishmen has a mean of 170 cm and a standard deviation of 6.4 cm, while a sample of heights of 1600 Australians has a mean of 172 cm and a standard deviation of 6.3 cm. Do the data indicate that the Australians are on the average taller than the Englishmen?
 
+```r
+xbar=170
+ybar=172
+n1=6400
+n2=1600
+sd1=6.4
+sd2=6.3
+xbar
+ybar
+n1
+n2
+sd1
+sd2
+z=(xbar-ybar)/((sd1^2/n1)+(sd2^2/n2))^0.5
+z
+alpha=0.05
+alpha
+zalpha=qnorm(1-alpha)
+zalpha
+if(abs(z)<=zalpha){print("accept null hypothesis")}else{print("reject null hypothesis")}
+```
 OUTPUT:
+```r
+> xbar=170
+> ybar=172
+> n1=6400
+> n2=1600
+> sd1=6.4
+> sd2=6.3
+> xbar
+[1] 170
+> ybar
+[1] 172
+> n1
+[1] 6400
+> n2
+[1] 1600
+> sd1
+[1] 6.4
+> sd2
+[1] 6.3
+> z=(xbar-ybar)/((sd1^2/n1)+(sd2^2/n2))^0.5
+> z
+[1] -11.32164
+> alpha=0.05
+> alpha
+[1] 0.05
+> zalpha=qnorm(1-alpha)
+> zalpha
+[1] 1.644854
+> if(abs(z)<=zalpha){print("accept null hypothesis")}else{print("reject null hypothesis")}
+[1] "reject null hypothesis"
+```
 
 ### 5)	(a) Compute the covariance between the highest temperature and highest rainfall, and then determine the correlation coefficient between these two variables using Pearson’s formula. 	
 ### (b) Perform a Spearman’s correlation test to check for an association between temperature and rainfall.                                                                                                                 
 ![image](https://github.com/user-attachments/assets/4bb8b355-abbc-4fcf-86db-b55d46784665)
 
+```r
+heighest_temp=c(38.5,40.2,36.8,41.5,39.0,42.3,37.3,43.1,35.9,40.8)
+heighest_temp
+heighest_rain=c(170,185,160,200,175,210,155,220,145,190)
+heighest_rain
+#(a)
+covariance=cov(heighest_temp,heighest_rain)
+covariance
+correlation=cor.test(heighest_temp,heighest_rain,method="pearson")
+correlation
+#(b)
+correlation1=cor.test(heighest_temp,heighest_rain,method="spearman")
+correlation1
+
+```
 OUTPUT:
+```r
+> heighest_temp=c(38.5,40.2,36.8,41.5,39.0,42.3,37.3,43.1,35.9,40.8)
+> heighest_temp
+ [1] 38.5 40.2 36.8 41.5 39.0 42.3 37.3 43.1 35.9 40.8
+> heighest_rain=c(170,185,160,200,175,210,155,220,145,190)
+> heighest_rain
+ [1] 170 185 160 200 175 210 155 220 145 190
+> #(a)
+> covariance=cov(heighest_temp,heighest_rain)
+> covariance
+[1] 59.06667
+> correlation=cor.test(heighest_temp,heighest_rain,method="pearson")
+> correlation
+
+	Pearson's product-moment correlation
+
+data:  heighest_temp and heighest_rain
+t = 21.909, df = 8, p-value = 1.988e-08
+alternative hypothesis: true correlation is not equal to 0
+95 percent confidence interval:
+ 0.9642853 0.9981234
+sample estimates:
+      cor 
+0.9917694 
+
+> #(b)
+> correlation1=cor.test(heighest_temp,heighest_rain,method="spearman")
+> correlation1
+
+	Spearman's rank correlation rho
+
+data:  heighest_temp and heighest_rain
+S = 2, p-value < 2.2e-16
+alternative hypothesis: true rho is not equal to 0
+sample estimates:
+      rho 
+0.9878788 
+
+> 
+```
