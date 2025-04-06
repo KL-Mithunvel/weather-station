@@ -1,5 +1,5 @@
-# Comprehensive Summary & Cheat Sheet (Experiments 1–11)
-## **Experiment 1: Introduction to R & Data Handling**
+
+## Introduction to R & Data Handling
 - **Topics Covered**: Basic R commands, data types (numeric, character, logical, factor), creating vectors, performing arithmetic on vectors, reading and writing data.
 - **Key Learning**: Familiarity with R environment, installing packages, reading CSV files, exporting results.
 ```r
@@ -16,7 +16,7 @@ my_data <- read.csv("data.csv", stringsAsFactors = FALSE)
 # Exporting data
 write.csv(my_data, "output.csv", row.names = FALSE)
 ```
-## **Experiment 2: Summary Statistics & Visualization**
+##  Summary Statistics & Visualization
 - **Topics**: Creating data frames, summary statistics (mean, median, sd), frequency tables, bar plots, pie charts, box plots.
 - **Key Learning**: Exploratory Data Analysis (EDA), subsetting data, factor levels.
 ```r
@@ -37,7 +37,7 @@ pie(table(empinfo$empid))            # Pie chart
 barplot(table(empinfo$age))          # Bar chart
 boxplot(empinfo$age, main="Box Plot")# Box plot
 ```
-## **Experiment 3: Correlation & Simple Linear Regression**
+##  Correlation & Simple Linear Regression
 - **Topics**: Covariance, Pearson correlation, linear regression (`lm()`), interpreting the regression output.
 - **Key Learning**: Relationship between variables, using built-in datasets like `cars`.
 ```r
@@ -53,7 +53,7 @@ summary(model)
 plot(cars$speed, cars$dist)
 abline(model, col="red")
 ```
-## **Experiment 4: Multiple Linear Regression**
+##  Multiple Linear Regression
 - **Topics**: Multiple predictors in regression, model interpretation, 3D plots using `scatterplot3d`.
 - **Key Learning**: Extending the `lm()` function to `lm(Y ~ X1 + X2)`.
 ```r
@@ -71,7 +71,7 @@ install.packages("scatterplot3d")
 library(scatterplot3d)
 scatterplot3d(X1, X2, Y)
 ```
-## **Experiment 5: Binomial Probability Distribution**
+##  Binomial Probability Distribution
 - **Topics**: `dbinom()`, `pbinom()`, `qbinom()`, `rbinom()`, binomial probability, at most/at least scenarios.
 - **Key Learning**: Discrete distribution usage in R.
 ```r
@@ -90,7 +90,7 @@ pbinom(k, size=n, prob=p)
 # Random binomial values
 rbinom(10, size=4, prob=0.02)
 ```
-## **Experiment 6: Poisson & Normal Distributions**
+##  Poisson & Normal Distributions
 - **Topics**: Poisson distribution (`dpois()`, `ppois()`, etc.), normal distribution (`dnorm()`, `pnorm()`, etc.), visualizing distributions.
 - **Key Learning**: Continuous vs discrete distributions, `plot()` for PMF/PDF.
 ```r
@@ -111,7 +111,7 @@ plot(x, y, type="l")
 pnorm(15, mean=20, sd=5)   # P(X<15)
 1 - pnorm(25, 20, 5)       # P(X>25)
 ```
-## **Experiment 7: Hypothesis Testing for One-Sample Mean & Proportion**
+## Hypothesis Testing for One-Sample Mean & Proportion
 - **Topics**: One-sample z-tests (large sample, known σ), one-sample proportion tests, calculating p-values, acceptance/rejection of H₀.
 - **Key Learning**: Large-sample approximations, usage of `qnorm()`, `pnorm()`, and manual formula.
 ```r
@@ -132,7 +132,7 @@ z_prop <- (p_hat - p0) / sqrt(p0*(1-p0)/n)
 ```
 
 ---
-## **Experiment 8: Hypothesis Testing for Two-Sample Means & Proportions**
+##  Hypothesis Testing for Two-Sample Means & Proportions
 - **Topics**: Large-sample tests for difference of means, difference of proportions, critical values from `qnorm()`, concluding via p-value.
 - **Key Learning**: Independent samples, combined proportion, test statistic formulas.
 ```r
@@ -150,7 +150,7 @@ P <- (n1*p1 + n2*p2)/(n1+n2)
 Q <- 1 - P
 z_prop <- (p1 - p2) / sqrt(P*Q*((1/n1)+(1/n2)))
 ```
-## **Experiment 9: t-Test (Independent, Paired) & F-Test**
+##  t-Test (Independent, Paired) & F-Test
 - **Topics**: t-tests for small samples (<30), Welch’s t-test for independent groups, paired t-test, F-test for comparing variances.
 - **Key Learning**: `t.test()` usage with `paired=TRUE` or `paired=FALSE`, `var.test()` for F-test.
 ```r
@@ -168,7 +168,7 @@ paired_res <- t.test(test1, test2, paired=TRUE)
 # F-test
 var_res <- var.test(sample1, sample2)
 ```
-## **Experiment 10: Chi-Square Goodness-of-Fit & Independence**
+##  Chi-Square Goodness-of-Fit & Independence
 - **Topics**: Pearson’s chi-square test, comparing observed vs. expected frequencies (goodness of fit), contingency tables (independence).
 - **Key Learning**: Using `chisq.test()` for both single categorical variable (goodness of fit) and two categorical variables.
 ```r
@@ -182,7 +182,7 @@ table_mat <- matrix(c(69,51,81,20,35,44), ncol=2, byrow=TRUE)
 chisq_test <- chisq.test(table_mat)
 chisq_test$p.value
 ```
-## **Experiment 11: ANOVA (CRD, RBD, LSD)**
+##  ANOVA (CRD, RBD, LSD)
 - **Topics**: One-way ANOVA (CRD), two-way ANOVA (RBD), Latin Square Design (3 factors but “lighter” than full 3-way ANOVA).
 - **Key Learning**: Use `aov()` for analysis, interpret factor effects.
 ```r
@@ -215,7 +215,7 @@ write.csv(data_frame, "output.csv", row.names=FALSE)
 ```
 - **Use**: For reading/writing tabular data in CSV format.
 
-### **2. Basic Summary & Plot**
+### 2. Basic Summary & Plot
 ```r
 summary(my_data)       # Gives min, max, mean, median, etc.
 plot(x, y)             # Scatter/line plot depending on arguments
