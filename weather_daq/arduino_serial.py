@@ -37,4 +37,5 @@ class ArduinoSerial:
 
     def reset_arduino(self):
         self.close()
+        time.sleep(2)
         self.connect()
