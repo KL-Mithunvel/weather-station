@@ -20,6 +20,20 @@ def clean_up():
         pass
 
 
+def check_date_change():
+    current_date = datetime.now().date()
+
+    if not hasattr(check_date_change, 'last_date'):
+        check_date_change.last_date = current_date
+        return False
+
+    if current_date != check_date_change.last_date:
+        check_date_change.last_date = current_date
+        return True
+
+    return False
+
+
 def acquire_loop():
     run = True
     write_wd_msg = WRITE_WATCHDOG_LOG_MSG = 30
@@ -34,6 +48,10 @@ def acquire_loop():
         rec.rain_qty = arduino_data['rain_qty']
         rec.cpu_temp = cpu.read_cpu_temp()
         db.write_record(rec)
+
+        if check_date_change():
+            logger.debug("New date detected. Clearing Rain Value...")
+            arduino.reset_arduino()
 
         time.sleep(settings.ACQUIRE_INTERVAL)
 
