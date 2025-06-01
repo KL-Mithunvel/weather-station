@@ -1,4 +1,4 @@
-from flask import Flask, Response, jsonify
+from flask import Flask, Response, jsonify, redirect, url_for
 import csv
 import io
 import sys
@@ -9,12 +9,19 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 from weather_daq import db_api
 import web_settings
 
-
+def validate_date_str(date_str):
+    try:
+        datetime.datetime.strptime(date_str, "%Y-%m-%d")
+        return True
+    except ValueError:
+        return False
 app = Flask(__name__)
 
 @app.route('/api/weather_data', defaults={'date_str': None}, methods=['GET'])
 @app.route('/api/weather_data/<date_str>', methods=['GET'])
 def api_weather_data(date_str):
+    if date_str and not validate_date_str(date_str):
+        return "Invalid date format. Should be YYYY-MM-DD", 400
     today = datetime.date.today().strftime("%Y-%m-%d")
     date_str = date_str or today
 
@@ -25,6 +32,8 @@ def api_weather_data(date_str):
 
 @app.route('/api/weather_summary/<date_str>', methods=['GET'])
 def api_weather_summary(date_str=None):
+    if date_str and not validate_date_str(date_str):
+        return "Invalid date format. Should be YYYY-MM-DD", 400
     today = datetime.date.today().strftime("%Y-%m-%d")
     date_str = date_str or today
 
@@ -34,6 +43,9 @@ def api_weather_summary(date_str=None):
 
 @app.route('/api/data_export/csv/<date_str>', methods=['GET'])
 def get_weather_csv(date_str):
+    if date_str and not validate_date_str(date_str):
+        return "Invalid date format. Should be YYYY-MM-DD", 400
+
     weather_db = db_api.WeatherDB(web_settings.DB_SETTINGS)
     weather_db.connect()
     rows = weather_db.get_records_by_date(date_str)
@@ -93,6 +105,9 @@ def home():
     </body>
     </html>
     """
+@app.route('/')
+def index():
+    return redirect(url_for('home'))
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=8000, debug=True)

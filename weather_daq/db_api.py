@@ -113,10 +113,10 @@ class WeatherDB:
 
     def get_records_by_date(self, dt):
         self.check_connection()
-        csql = "SELECT * FROM weather WHERE DATE(timestamp) = '{}'".format(dt);
+        csql = "SELECT * FROM weather WHERE DATE(timestamp) = ?"
 
         cursor = self.connection.cursor()
-        cursor.execute(csql)
+        cursor.execute(csql,(dt,))
         return cursor.fetchall()
 
     def get_last_record(self):
