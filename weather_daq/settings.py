@@ -17,3 +17,6 @@ DHT_PIN = board.D4
 WIND_SPEED_PIN = None
 WIND_DIR_PIN = None
 RAIN_PIN = None
+
+SERIAL_PORT = '/dev/ttyACM0'
+BAUD_RATE = 115200

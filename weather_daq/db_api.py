@@ -6,7 +6,8 @@ class WeatherRecord:
         self.timestamp = self.temp = self.rh = self.cpu_temp = self.wind_speed = self.wind_dir = self.rain_qty = None
 
     def __str__(self):
-        return f"WeatherRecord(timestamp={self.timestamp}, temp={self.temp}, rh={self.rh}, cpu_temp={self.cpu_temp}, wind_speed={self.wind_speed}, wind_dir={self.wind_dir}, rain_qty={self.rain_qty})"
+        return (f"WeatherRecord(timestamp={self.timestamp}, temp={self.temp}, rh={self.rh}, cpu_temp={self.cpu_temp}, "
+                f"wind_speed={self.wind_speed}, wind_dir={self.wind_dir}, rain_qty={self.rain_qty})")
 
 
 class WeatherDB:

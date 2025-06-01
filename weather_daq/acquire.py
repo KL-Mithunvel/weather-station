@@ -4,8 +4,9 @@ import time
 import db_api
 import pi_cpu_temp
 import dht_sensor
-import wind_sensors
-import rain_sensor
+#import wind_sensors
+#import rain_sensor
+import arduino_serial
 import settings
 from daq_log import logger
 
@@ -27,8 +28,10 @@ def acquire_loop():
         rec = db_api.WeatherRecord()
         rec.timestamp = datetime.now().replace(microsecond=0)
         rec.temp, rec.rh = dht.read_values()
-        rec.wind_dir = wind.wind_dir
-        rec.wind_speed = wind.wind_speed
+        arduino_data = arduino.read_values()
+        rec.wind_dir = arduino_data['wind_dir']
+        rec.wind_speed = arduino_data['wind_speed']
+        rec.rain_qty = arduino_data['rain_qty']
         rec.cpu_temp = cpu.read_cpu_temp()
         db.write_record(rec)
 
@@ -44,9 +47,7 @@ def acquire_loop():
 
 logger.info("Booting acquire loop...")
 dht:dht_sensor.DHTSensor = dht_sensor.DHTSensor(dht_pin=settings.DHT_PIN)
-wind:wind_sensors.WindSensors = wind_sensors.WindSensors(speed_pin=settings.WIND_SPEED_PIN,
-                                                         dir_pin=settings.WIND_DIR_PIN)
-rain:rain_sensor.RainSensor = rain_sensor.RainSensor(rain_pin=settings.RAIN_PIN)
+arduino:arduino_serial.ArduinoSerial = arduino_serial.ArduinoSerial(settings.SERIAL_PORT, settings.BAUD_RATE)
 cpu: pi_cpu_temp.PiBoard = pi_cpu_temp.PiBoard()
 db: db_api.WeatherDB = db_api.WeatherDB(settings.DB_SETTINGS)
 
