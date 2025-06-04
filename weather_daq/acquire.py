@@ -43,9 +43,13 @@ def acquire_loop():
         rec.timestamp = datetime.now().replace(microsecond=0)
         rec.temp, rec.rh = dht.read_values()
         arduino_data = arduino.read_values()
-        rec.wind_dir = arduino_data['wind_dir']
-        rec.wind_speed = arduino_data['wind_speed']
-        rec.rain_qty = arduino_data['rain_qty']
+        if arduino_data:
+            rec.wind_dir = arduino_data['wind_dir']
+            rec.wind_speed = arduino_data['wind_speed']
+            rec.rain_qty = arduino_data['rain_qty']
+        else:
+            rec.wind_speed = rec.wind_dir = rec.rain_qty = None
+
         rec.cpu_temp = cpu.read_cpu_temp()
         db.write_record(rec)
 

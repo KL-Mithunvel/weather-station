@@ -7,6 +7,8 @@ User=klm
 Group=klm
 WorkingDirectory=/home/klm/weather/weather_daq/
 ExecStart=/home/klm/weather/weather_daq/.venv-daq/bin/python acquire.py
+Restart=on-failure
+RestartSec=5
 
 [Install]
 WantedBy=multi-user.target

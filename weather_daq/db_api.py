@@ -86,12 +86,12 @@ class WeatherDB:
         stats = cur.fetchone()
         d = {
                 "date": dt ,
-                "temp": {"min": stats[0], "max": stats[1], "avg": round(stats[2],1)},
-                "rh":   {"min": stats[3], "max": stats[4], "avg": round(stats[5],1)},
-                "wind_speed": {"max": stats[6], "avg": round(stats[7],1)},
-                "wind_dir": {"avg": round(stats[8],0)},
+                "temp": {"min": stats[0], "max": stats[1], "avg": round(stats[2] or 0,1)},
+                "rh":   {"min": stats[3], "max": stats[4], "avg": round(stats[5] or 0,1)},
+                "wind_speed": {"max": stats[6], "avg": round(stats[7] or 0,1)},
+                "wind_dir": {"avg": round(stats[8] or 0,0)},
                 "rain": {"total": stats[9]},
-                "cpu_temp": {"min": stats[10], "max": stats[11], "avg": round(stats[12],1)},
+                "cpu_temp": {"min": stats[10], "max": stats[11], "avg": round(stats[12] or 0,1)},
             }
         return d
 

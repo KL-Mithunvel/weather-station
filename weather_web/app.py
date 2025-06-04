@@ -92,7 +92,7 @@ def home():
         <title>Weather Data</title>
     </head>
     <body>
-        <h1>Current Weather Data</h1>
+        <h1>Current Weather Data - Pavoorchatram, Tenkasi Dt., TN, India.</h1>
         <table border='1' cellpadding='5' cellspacing='0'>
             <tr><td>Last Reading</td><td>{last_reading}</td><td>Min</td><td>Max</td><td>Avg</td></tr>
             <tr><td>Temperature</td><td>{cur_temp} oC</td><td>{ds['temp']['min']}</td><td>{ds['temp']['max']}</td><td>{ds['temp']['avg']}</td></tr>
