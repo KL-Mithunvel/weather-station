@@ -2,6 +2,7 @@ from datetime import datetime
 import time
 
 import db_api
+import WeatherTimeScaleDB
 import pi_cpu_temp
 import dht_sensor
 #import wind_sensors
@@ -52,6 +53,7 @@ def acquire_loop():
 
         rec.cpu_temp = cpu.read_cpu_temp()
         db.write_record(rec)
+        tdb.write_record(rec)
 
         if check_date_change():
             logger.debug("New date detected. Clearing Rain Value...")
@@ -72,6 +74,7 @@ dht:dht_sensor.DHTSensor = dht_sensor.DHTSensor(dht_pin=settings.DHT_PIN)
 arduino:arduino_serial.ArduinoSerial = arduino_serial.ArduinoSerial(settings.SERIAL_PORT, settings.BAUD_RATE)
 cpu: pi_cpu_temp.PiBoard = pi_cpu_temp.PiBoard()
 db: db_api.WeatherDB = db_api.WeatherDB(settings.DB_SETTINGS)
+tdb: WeatherTimeScaleDB.WeatherTimeScaleDB = WeatherTimeScaleDB.WeatherTimeScaleDB(settings.DB_SETTINGS)
 
 try:
     acquire_loop()
