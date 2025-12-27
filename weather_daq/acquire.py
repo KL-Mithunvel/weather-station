@@ -78,6 +78,7 @@ tdb: WeatherTimeScaleDB.WeatherTimeScaleDB = WeatherTimeScaleDB.WeatherTimeScale
 
 try:
     acquire_loop()
-except (Exception) as e:
-    logger.error(f"Exception occurred. Exiting. \n {e}")
+except Exception as e:
+    logger.error(f"Exception occurred: {e}")
+    logger.error("Traceback details:", exc_info=True)
     clean_up()
