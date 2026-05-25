@@ -1,4 +1,5 @@
 from datetime import datetime
+import json
 import time
 
 import db_api
@@ -10,6 +11,20 @@ import dht_sensor
 import arduino_serial
 import settings
 from daq_log import logger
+
+DHT_STATUS_FILE = '/tmp/dht_status.json'
+
+def write_dht_status(sensor: dht_sensor.DHTSensor):
+    status = {
+        'is_faulty': sensor.is_faulty,
+        'last_error': sensor.last_error,
+        'updated': datetime.now().replace(microsecond=0).isoformat(),
+    }
+    try:
+        with open(DHT_STATUS_FILE, 'w') as f:
+            json.dump(status, f)
+    except Exception as e:
+        logger.error(f'Failed to write DHT status file: {e}')
 
 
 def clean_up():
@@ -43,6 +58,7 @@ def acquire_loop():
         rec = db_api.WeatherRecord()
         rec.timestamp = datetime.now().replace(microsecond=0)
         rec.temp, rec.rh = dht.read_values()
+        write_dht_status(dht)
         arduino_data = arduino.read_values()
         if arduino_data:
             rec.wind_dir = arduino_data['wind_dir']

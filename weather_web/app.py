@@ -1,6 +1,7 @@
 from flask import Flask, Response, jsonify, redirect, url_for
 import csv
 import io
+import json
 import sys
 import os
 import datetime
@@ -15,6 +16,15 @@ def validate_date_str(date_str):
         return True
     except ValueError:
         return False
+DHT_STATUS_FILE = '/tmp/dht_status.json'
+
+def get_dht_status():
+    try:
+        with open(DHT_STATUS_FILE) as f:
+            return json.load(f)
+    except Exception:
+        return None
+
 app = Flask(__name__)
 
 @app.route('/api/weather_data', defaults={'date_str': None}, methods=['GET'])
@@ -85,7 +95,17 @@ def home():
     cur_rain_qty = cur_weather[7]
 
     ds = weather_db.get_daily_summary(today)
-    
+    dht_status = get_dht_status()
+
+    dht_alert = ''
+    if dht_status and dht_status.get('is_faulty'):
+        error_msg = dht_status.get('last_error', 'Unknown error')
+        updated = dht_status.get('updated', '')
+        dht_alert = f"""
+        <div style='background:#ffe0e0;border:1px solid #c00;padding:10px;margin-bottom:10px;color:#900;'>
+            <strong>DHT22 Sensor Error</strong> (as of {updated}): {error_msg}
+        </div>"""
+
     return f"""
     <html>
     <head>
@@ -93,6 +113,7 @@ def home():
     </head>
     <body>
         <h1>Current Weather Data - Pavoorchatram, Tenkasi Dt., TN, India.</h1>
+        {dht_alert}
         <table border='1' cellpadding='5' cellspacing='0'>
             <tr><td>Last Reading</td><td>{last_reading}</td><td>Min</td><td>Max</td><td>Avg</td></tr>
             <tr><td>Temperature</td><td>{cur_temp} oC</td><td>{ds['temp']['min']}</td><td>{ds['temp']['max']}</td><td>{ds['temp']['avg']}</td></tr>

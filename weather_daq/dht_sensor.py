@@ -10,6 +10,7 @@ from daq_log import logger
 class DHTSensor:
     def __init__(self, dht_pin: pin):
         self.is_faulty = False
+        self.last_error = None
         self.dht = None
         self.dht_pin = dht_pin
         self.open()
@@ -37,13 +38,15 @@ class DHTSensor:
                 t = self.dht.temperature
                 h = self.dht.humidity
                 self.is_faulty = False
+                self.last_error = None
                 self.add_readings_to_buffer(t, h)
                 return t, h
             except (Exception) as e:
                 self.is_faulty = True
+                self.last_error = str(e)
                 count -= 1
                 logger.error(
-                    f'DHT22 sensor exception, retrying... ({count} retries left)'
+                    f'DHT22 sensor exception: {e}, retrying... ({count} retries left)'
                 )
                 time.sleep(settings.DHT_RECOVERY_INTERVAL)
         return None, None

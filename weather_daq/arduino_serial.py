@@ -23,14 +23,27 @@ class ArduinoSerial:
 
     def read_values(self):
         try:
-            while True:
-                if self.serial.in_waiting > 0:
-                    line = self.serial.readline().decode('utf-8', errors='replace').strip()
-                    if line:
-                        values = [ round(float(x),2) for x in line.split(',')]
-                        cur_rain_val = values[2] - (self.last_rain_value if self.last_rain_value is not None else values[2])
-                        self.last_rain_value = values[2]
-                        return {"wind_dir" : values[0], "wind_speed" : values[1], "rain_qty" : cur_rain_val}
+            last_line = None
+
+            # Drain all buffered lines, keep only the most recent
+            while self.serial.in_waiting > 0:
+                line = self.serial.readline().decode('utf-8', errors='replace').strip()
+                if line:
+                    last_line = line
+
+            # If nothing was buffered, block for one fresh line
+            if last_line is None:
+                line = self.serial.readline().decode('utf-8', errors='replace').strip()
+                if line:
+                    last_line = line
+
+            if last_line:
+                values = [round(float(x), 2) for x in last_line.split(',')]
+                cur_rain_val = values[2] - (self.last_rain_value if self.last_rain_value is not None else values[2])
+                self.last_rain_value = values[2]
+                return {"wind_dir": values[0], "wind_speed": values[1], "rain_qty": cur_rain_val}
+            return None
+
         except Exception as e:
             print(f"Error reading serial data: {e}")
             return None
