@@ -1,0 +1,280 @@
+{% extends "base.html" %}
+{% block title %}Weather Station — Pavoorchatram{% endblock %}
+
+{% block body %}
+<header class="site-header">
+  <div class="header-left">
+    <div class="station-name">WEATHER STATION</div>
+    <div class="station-loc">Pavoorchatram · Tenkasi Dt. · Tamil Nadu</div>
+  </div>
+  <div class="header-center">
+    <div class="live-clock" id="live-clock">--:--:--</div>
+    <div class="last-updated">Updated <span id="last-updated-ago">--</span></div>
+  </div>
+  <div class="header-right">
+    <span class="live-dot" id="live-dot"></span>
+    <span class="live-status-text" id="live-status">CONNECTING</span>
+  </div>
+</header>
+
+<div id="alert-banner" class="alert-banner hidden">
+  <span id="alert-text"></span>
+  <button class="alert-dismiss" onclick="dismissAlert()" title="Dismiss">✕</button>
+</div>
+
+<main class="main-grid">
+
+  <!-- Left: Current Conditions -->
+  <section class="conditions-panel">
+    <div class="section-header">CURRENT CONDITIONS</div>
+    <div class="cards-grid">
+
+      <div class="card" id="card-temp">
+        <div class="card-header">
+          <svg class="card-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M14 14.76V3.5a2.5 2.5 0 0 0-5 0v11.26a4.5 4.5 0 1 0 5 0z"/>
+          </svg>
+          <span class="card-label">TEMPERATURE</span>
+        </div>
+        <div class="card-value"><span id="cur-temp">--.-</span><span class="card-unit">°C</span></div>
+        <div class="card-sublabel" id="feels-like"></div>
+        <div class="card-stats">
+          <span>MIN <strong id="min-temp">--</strong></span>
+          <span>AVG <strong id="avg-temp">--</strong></span>
+          <span>MAX <strong id="max-temp">--</strong></span>
+        </div>
+        <div class="card-gauge"><div class="card-gauge-bar" id="gauge-temp"></div></div>
+      </div>
+
+      <div class="card" id="card-rh">
+        <div class="card-header">
+          <svg class="card-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0z"/>
+          </svg>
+          <span class="card-label">HUMIDITY</span>
+        </div>
+        <div class="card-value"><span id="cur-rh">--.-</span><span class="card-unit">% RH</span></div>
+        <div class="card-sublabel" id="dew-point"></div>
+        <div class="card-stats">
+          <span>MIN <strong id="min-rh">--</strong></span>
+          <span>AVG <strong id="avg-rh">--</strong></span>
+          <span>MAX <strong id="max-rh">--</strong></span>
+        </div>
+        <div class="card-gauge"><div class="card-gauge-bar" id="gauge-rh"></div></div>
+      </div>
+
+      <div class="card" id="card-rain">
+        <div class="card-header">
+          <svg class="card-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M20 16.58A5 5 0 0 0 18 7h-1.26A8 8 0 1 0 4 15.25"/>
+            <line x1="8" y1="19" x2="8" y2="21"/><line x1="8" y1="13" x2="8" y2="15"/>
+            <line x1="16" y1="19" x2="16" y2="21"/><line x1="16" y1="13" x2="16" y2="15"/>
+            <line x1="12" y1="21" x2="12" y2="23"/><line x1="12" y1="15" x2="12" y2="17"/>
+          </svg>
+          <span class="card-label">RAIN TODAY</span>
+        </div>
+        <div class="card-value"><span id="cur-rain">--.-</span><span class="card-unit">mm</span></div>
+        <div class="card-sublabel" id="cur-rain-label">cumulative today</div>
+        <div class="card-stats">
+          <span>TOTAL <strong id="total-rain">--</strong> mm</span>
+        </div>
+        <div class="card-gauge"><div class="card-gauge-bar" id="gauge-rain"></div></div>
+      </div>
+
+      <div class="card" id="card-cpu">
+        <div class="card-header">
+          <svg class="card-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="4" y="4" width="16" height="16" rx="2"/>
+            <rect x="9" y="9" width="6" height="6"/>
+            <line x1="9" y1="1" x2="9" y2="4"/><line x1="15" y1="1" x2="15" y2="4"/>
+            <line x1="9" y1="20" x2="9" y2="23"/><line x1="15" y1="20" x2="15" y2="23"/>
+            <line x1="20" y1="9" x2="23" y2="9"/><line x1="20" y1="14" x2="23" y2="14"/>
+            <line x1="1" y1="9" x2="4" y2="9"/><line x1="1" y1="14" x2="4" y2="14"/>
+          </svg>
+          <span class="card-label">CPU TEMP</span>
+        </div>
+        <div class="card-value"><span id="cur-cpu">--.-</span><span class="card-unit">°C</span></div>
+        <div class="card-sublabel">Raspberry Pi 4B</div>
+        <div class="card-stats">
+          <span>MIN <strong id="min-cpu">--</strong></span>
+          <span>AVG <strong id="avg-cpu">--</strong></span>
+          <span>MAX <strong id="max-cpu">--</strong></span>
+        </div>
+        <div class="card-gauge"><div class="card-gauge-bar" id="gauge-cpu"></div></div>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- Right: Wind Panel -->
+  <section class="wind-panel">
+    <div class="section-header">WIND</div>
+    <div class="wind-speed-display">
+      <span id="cur-wind-speed">--.-</span>
+      <span class="wind-speed-unit">kph</span>
+    </div>
+    <div class="wind-speed-stats">
+      MAX <strong id="max-wind-speed">--</strong> &nbsp; AVG <strong id="avg-wind-speed">--</strong>
+    </div>
+    <div id="compass-container"></div>
+    <div class="wind-dir-label" id="wind-dir-label">--° · -- · --</div>
+  </section>
+
+  <!-- Bottom: Graphs / History tabs -->
+  <section class="data-panel">
+    <div class="tab-bar">
+      <button class="tab-btn active" data-tab="graphs">GRAPHS</button>
+      <button class="tab-btn" data-tab="history">HISTORY</button>
+    </div>
+
+    <!-- GRAPHS TAB -->
+    <div id="tab-graphs" class="tab-pane active">
+      <div class="chart-toolbar">
+        <div class="toolbar-group">
+          <span class="toolbar-label">RANGE</span>
+          <button class="range-btn" data-hours="1">1H</button>
+          <button class="range-btn" data-hours="6">6H</button>
+          <button class="range-btn" data-hours="12">12H</button>
+          <button class="range-btn active" data-hours="24">24H</button>
+        </div>
+        <div class="toolbar-group">
+          <span class="toolbar-label">OVERLAYS</span>
+          <button class="overlay-btn active" data-overlay="min">MIN</button>
+          <button class="overlay-btn active" data-overlay="max">MAX</button>
+          <button class="overlay-btn active" data-overlay="avg">AVG</button>
+        </div>
+      </div>
+
+      <div class="charts-grid">
+        <div class="chart-wrap chart-full">
+          <div class="chart-title">TEMPERATURE (°C)</div>
+          <div class="chart-canvas-wrap"><canvas id="chart-temp"></canvas></div>
+        </div>
+        <div class="chart-wrap">
+          <div class="chart-title">HUMIDITY (% RH)</div>
+          <div class="chart-canvas-wrap"><canvas id="chart-rh"></canvas></div>
+        </div>
+        <div class="chart-wrap">
+          <div class="chart-title">WIND SPEED (kph)</div>
+          <div class="chart-canvas-wrap"><canvas id="chart-wind-speed"></canvas></div>
+        </div>
+        <div class="chart-wrap">
+          <div class="chart-title">WIND DIRECTION</div>
+          <div class="chart-canvas-wrap"><canvas id="chart-wind-dir"></canvas></div>
+        </div>
+        <div class="chart-wrap">
+          <div class="chart-title">RAIN ACCUMULATION (mm)</div>
+          <div class="chart-canvas-wrap"><canvas id="chart-rain"></canvas></div>
+        </div>
+        <div class="chart-wrap">
+          <div class="chart-title">WIND ROSE (24h)</div>
+          <div class="chart-canvas-wrap"><canvas id="chart-wind-rose"></canvas></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- HISTORY TAB -->
+    <div id="tab-history" class="tab-pane hidden">
+      <div class="date-nav">
+        <button class="date-nav-btn" id="prev-day" title="Previous day">◀</button>
+        <input type="date" id="history-date" class="date-input">
+        <button class="date-nav-btn" id="next-day" title="Next day">▶</button>
+        <span class="today-badge hidden" id="today-badge">TODAY</span>
+      </div>
+
+      <div id="history-summary" class="history-summary hidden">
+        <div class="section-header" id="history-date-label"></div>
+        <table class="summary-table">
+          <thead>
+            <tr><th>METRIC</th><th>MIN</th><th>AVG</th><th>MAX</th><th>TOTAL</th></tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Temperature (°C)</td>
+              <td id="h-min-temp">--</td><td id="h-avg-temp">--</td><td id="h-max-temp">--</td><td>—</td>
+            </tr>
+            <tr>
+              <td>Humidity (% RH)</td>
+              <td id="h-min-rh">--</td><td id="h-avg-rh">--</td><td id="h-max-rh">--</td><td>—</td>
+            </tr>
+            <tr>
+              <td>Wind Speed (kph)</td>
+              <td>—</td><td id="h-avg-wind">--</td><td id="h-max-wind">--</td><td>—</td>
+            </tr>
+            <tr>
+              <td>Wind Direction (°)</td>
+              <td>—</td><td id="h-avg-dir">--</td><td>—</td><td>—</td>
+            </tr>
+            <tr>
+              <td>Rain (mm)</td>
+              <td>—</td><td>—</td><td>—</td><td id="h-total-rain">--</td>
+            </tr>
+          </tbody>
+        </table>
+
+        <div class="charts-grid" id="history-charts-grid">
+          <div class="chart-wrap chart-full">
+            <div class="chart-title" id="history-temp-title">TEMPERATURE</div>
+            <div class="chart-canvas-wrap"><canvas id="hchart-temp"></canvas></div>
+          </div>
+          <div class="chart-wrap">
+            <div class="chart-title">HUMIDITY</div>
+            <div class="chart-canvas-wrap"><canvas id="hchart-rh"></canvas></div>
+          </div>
+          <div class="chart-wrap">
+            <div class="chart-title">WIND SPEED</div>
+            <div class="chart-canvas-wrap"><canvas id="hchart-wind-speed"></canvas></div>
+          </div>
+          <div class="chart-wrap">
+            <div class="chart-title">RAIN ACCUMULATION</div>
+            <div class="chart-canvas-wrap"><canvas id="hchart-rain"></canvas></div>
+          </div>
+        </div>
+
+        <div class="download-bar">
+          <a id="dl-csv" class="dl-btn" href="#">&#8595; Download CSV</a>
+          <a id="dl-json" class="dl-btn" href="#" id="dl-json">&#8595; Download JSON</a>
+        </div>
+      </div>
+
+      <div id="history-loading" class="history-loading hidden">Loading…</div>
+      <div id="history-empty" class="history-empty hidden">No data for this date.</div>
+    </div>
+  </section>
+</main>
+
+<!-- Sensor Status Panel -->
+<footer class="sensor-panel">
+  <div class="section-header">SENSOR STATUS</div>
+  <div class="sensor-rows">
+    <div class="sensor-row" id="sensor-dht22">
+      <span class="sensor-dot" id="dot-dht22"></span>
+      <span class="sensor-name">DHT22 — Temp/Humidity</span>
+      <span class="sensor-status-text" id="status-dht22">—</span>
+      <span class="sensor-msg" id="msg-dht22"></span>
+    </div>
+    <div class="sensor-row" id="sensor-arduino">
+      <span class="sensor-dot" id="dot-arduino"></span>
+      <span class="sensor-name">Arduino — Wind/Rain</span>
+      <span class="sensor-status-text" id="status-arduino">—</span>
+      <span class="sensor-msg" id="msg-arduino"></span>
+    </div>
+    <div class="sensor-row" id="sensor-cpu">
+      <span class="sensor-dot" id="dot-cpu"></span>
+      <span class="sensor-name">CPU Temperature</span>
+      <span class="sensor-status-text" id="status-cpu">—</span>
+      <span class="sensor-msg" id="msg-cpu"></span>
+    </div>
+  </div>
+  <div class="sensor-check-time">Last check: <span id="sensor-check-time">—</span></div>
+</footer>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3.0.0/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
+<script src="{{ url_for('static', filename='js/compass.js') }}"></script>
+<script src="{{ url_for('static', filename='js/charts.js') }}"></script>
+<script src="{{ url_for('static', filename='js/history.js') }}"></script>
+<script src="{{ url_for('static', filename='js/dashboard.js') }}"></script>
+{% endblock %}

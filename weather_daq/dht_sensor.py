@@ -67,11 +67,13 @@ class DHTSensor:
 
     def recover_sensor(self):
         self.close()
+        self.readings = []
         time.sleep(settings.DHT_RECOVERY_INTERVAL * 2)
         self.open()
 
 
 if __name__ == "__main__":
     s = DHTSensor(board.D4)
-    print(f'{s.read_temp()}oC {s.read_humidity()}%RH')
+    t, h = s.read_values()
+    print(f'{t}oC {h}%RH')
     s.close()

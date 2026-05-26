@@ -75,11 +75,11 @@ def acquire_loop():
             logger.debug("New date detected. Clearing Rain Value...")
             arduino.reset_arduino()
 
-        time.sleep(settings.ACQUIRE_INTERVAL)
-
         if dht.is_faulty or dht.readings_are_repeating():
             logger.error("DHT is in faulty state. Recovering... ")
             dht.recover_sensor()
+
+        time.sleep(settings.ACQUIRE_INTERVAL)
         write_wd_msg -= 1
         if write_wd_msg == 0:
             logger.info("Acquire running (watchdog message)...")

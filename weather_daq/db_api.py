@@ -126,6 +126,30 @@ class WeatherDB:
         cursor.execute(csql)
         return cursor.fetchall()
 
+    def get_last24h_records(self):
+        self.check_connection()
+        csql = """
+            SELECT id, timestamp, temp, rh, cpu_temp, wind_speed, wind_dir, rain_qty
+            FROM weather
+            WHERE timestamp >= datetime('now', '-24 hours')
+            ORDER BY timestamp ASC
+        """
+        cursor = self.connection.cursor()
+        cursor.execute(csql)
+        return cursor.fetchall()
+
+    def get_records_by_date_range(self, start_date, end_date):
+        self.check_connection()
+        csql = """
+            SELECT id, timestamp, temp, rh, cpu_temp, wind_speed, wind_dir, rain_qty
+            FROM weather
+            WHERE DATE(timestamp) >= ? AND DATE(timestamp) <= ?
+            ORDER BY timestamp ASC
+        """
+        cursor = self.connection.cursor()
+        cursor.execute(csql, (start_date, end_date))
+        return cursor.fetchall()
+
     def close(self):
         if self.connection:
             self.connection.close()

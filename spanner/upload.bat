@@ -1,3 +1,5 @@
-call secrets.bat
+call "%~dp0secrets.bat"
 pscp -l klm -pw %passwd% ..\weather_daq\*.* klm@rpi4b-weather:weather/weather_daq/
 pscp -l klm -pw %passwd% ..\weather_web\*.* klm@rpi4b-weather:weather/weather_web/
+pscp -r -l klm -pw %passwd% ..\weather_web\templates klm@rpi4b-weather:weather/weather_web/
+pscp -r -l klm -pw %passwd% ..\weather_web\static klm@rpi4b-weather:weather/weather_web/

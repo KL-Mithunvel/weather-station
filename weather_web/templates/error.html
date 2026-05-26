@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+{% block title %}Error — Weather Station{% endblock %}
+{% block body %}
+<div style="display:flex;align-items:center;justify-content:center;min-height:100vh;">
+  <div style="text-align:center;padding:2rem;">
+    <div style="font-size:4rem;color:var(--color-critical);">⚠</div>
+    <h1 style="color:var(--color-critical);font-family:var(--font-mono);">{{ code }}</h1>
+    <p style="color:var(--color-text-dim);">{{ message }}</p>
+    <a href="/" style="color:var(--color-accent);">← Return to dashboard</a>
+  </div>
+</div>
+{% endblock %}
