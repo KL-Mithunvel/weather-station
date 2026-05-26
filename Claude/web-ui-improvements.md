@@ -1,5 +1,7 @@
 # Weather Station Web UI — Current State & Improvement Plan
 
+---
+
 ## Current State of the Web UI
 
 ### Technology Stack
@@ -88,133 +90,311 @@ total_rain_qty  REAL
 
 ---
 
+## Wind Direction Convention
+
+The station uses the following degree-to-flow-direction mapping. Wind direction values stored in the database represent the direction the wind is **blowing toward** (destination direction):
+
+| Degrees | Flow Direction | Compass Label |
+|---|---|---|
+| 0° | NE → SW | North (compass heading of travel) |
+| 45° | E → W | NE |
+| 90° | SE → NW | East |
+| 135° | S → N | SE |
+| 180° | SW → NE | South |
+| 225° | W → E | SW |
+| 270° | NW → SE | West |
+| 315° | N → S | NW |
+
+**Important:** This is a non-standard convention. Standard meteorology uses the direction wind comes *from*, not *goes to*. The UI must use this station-specific mapping for all compass displays, arrow orientations, and labels — do not convert to the meteorological standard.
+
+**Compass display logic:**
+- Draw the wind arrow pointing in the direction of the stored degree value
+- Label it with both the degree number and the flow description (e.g. "315° — N→S")
+- Intermediate values: interpolate to nearest entry (e.g. 22° → label as "NNE → SSW")
+
+---
+
+## Design Inspiration — Mission Control Aesthetic
+
+The target visual style is a **dark-theme mission control dashboard**, inspired by space station monitoring panels:
+
+### Key Visual Principles
+
+| Element | Description |
+|---|---|
+| **Background** | Deep black (`#0a0a0f`) or very dark navy |
+| **Panel borders** | Bright cyan/blue glow (`#00b4d8` or `#0096c7`) — thin 1–2px borders with a subtle box-shadow glow |
+| **Panel backgrounds** | Dark charcoal cards (`#111827`) — distinct from the page background |
+| **Typography** | Monospace or near-monospace for numbers (e.g. JetBrains Mono, Courier, or system monospace); clean sans-serif for labels |
+| **Accent colours** | Use a 4-colour status palette (see below) |
+| **Status gauges** | Vertical or horizontal bars with red → yellow → green gradient (bottom=bad, top=good) |
+| **Icons** | Simple, outlined, bright-coloured SVG icons for each metric |
+| **Live clock** | Visible real-time clock in the header (HH:MM:SS) |
+| **Section headers** | All-caps labels above each panel, e.g. "TEMPERATURE", "WIND", "RAINFALL" |
+
+### Status Colour Palette
+
+| Colour | Hex | Use |
+|---|---|---|
+| Good / Normal | `#00e676` (bright green) | Values within expected range |
+| Caution | `#ffea00` (yellow) | Values approaching limits |
+| Alert | `#ff6d00` (orange) | Values near threshold |
+| Critical / Fault | `#f44336` (red) | Sensor fault, out-of-range values |
+| Inactive / Off | `#37474f` (dark grey) | Equipment off or unavailable |
+
+### Layout Grid
+
+Inspired by the control panel image, use a **CSS Grid** layout with named areas:
+
+```
+┌─────────────────────────────────────────────────────────┐
+│  HEADER: Station name · Location · Live clock · Status  │
+├──────────────────────────────┬──────────────────────────┤
+│  CURRENT CONDITIONS          │  WIND PANEL              │
+│  (temp, humidity, rain cards)│  (compass + speed gauge) │
+├──────────────────────────────┴──────────────────────────┤
+│  GRAPHS TAB  │  HISTORY TAB                             │
+│  (see below) │  (see below)                             │
+└─────────────────────────────────────────────────────────┘
+```
+
+---
+
 ## Improvement Plan
 
 ### Goals
-1. Make the interface immediately readable on any device (phone, tablet, desktop)
-2. Show data visually — trends matter more than raw numbers
-3. Let the user explore history without needing to know API URLs
-4. Keep the sensor health status visible at all times
-5. Make the data feel live — auto-refresh without a full page reload
+1. Dark mission-control look that is immediately readable day or night
+2. Current values displayed as status cards with colour-coded health indicators
+3. Charts show the past 24 hours with min / max / avg overlays
+4. Separate **History** sub-tab to browse and download any past day
+5. Live auto-refresh without full page reload
+6. Wind direction shown as an animated compass with the station-specific degree convention
 
 ---
 
-### Phase 1 — Foundation (structure and look)
+### Phase 1 — Foundation
 
 **Move HTML out of Python**
-- Create a proper `templates/` folder and use Jinja2 templates
-- Create a `static/` folder for CSS and JS
-- This keeps Python code clean and makes the UI easy to edit independently
+- Create `weather_web/templates/` for Jinja2 templates
+- Create `weather_web/static/css/` and `weather_web/static/js/`
+- Single base template (`base.html`) with the dark-theme CSS variables
+- All Python routes render templates, never concatenate HTML strings
 
-**Responsive layout**
-- Use a lightweight CSS framework (e.g. Pico CSS or plain CSS Grid/Flexbox) so the page works well on mobile
-- No heavy dependencies like Bootstrap unless the team prefers it
+**CSS architecture**
+- Use CSS custom properties (variables) for the colour palette so switching themes later is trivial
+- Plain CSS Grid + Flexbox — no heavy framework
+- Mobile-first: single column on phones, two columns on tablets, full grid on desktop
 
-**Page sections to create**
-1. Header bar — station name, location, last-updated time, live indicator dot
-2. Current conditions cards — one card per metric (temp, humidity, wind speed, wind dir, rain, CPU temp)
-3. Daily summary strip — min/max/avg for the day in a compact row
-4. Charts section — time-series graphs for the day
-5. History browser — date picker to load past days
-6. Footer — sensor status and system info
+**Add a `/` dashboard route** that returns the main SPA page (rename the current `/api/weather_web` to just be the legacy API fallback)
 
 ---
 
-### Phase 2 — Richer Data Display
+### Phase 2 — Current Conditions Cards
 
-**Current conditions cards**
-Each card should show:
-- Metric name and icon (thermometer, droplet, wind arrow, etc.)
-- Current value in large text
-- Daily min and max as small secondary text
-- A subtle colour that changes with value (e.g. temperature card shifts from blue → orange → red)
+One card per metric, styled like the status panels in the reference image:
 
-**Wind direction**
-- Replace raw degree number with a compass rose or a directional arrow graphic
-- Show the cardinal/intercardinal label (N, NNE, NE, …)
+**Card anatomy:**
+```
+┌────────────────────────┐
+│ ICON   METRIC NAME     │
+│                        │
+│      CURRENT VALUE     │  ← large monospace number
+│                        │
+│  MIN ──────── MAX      │  ← small secondary row
+│       AVG              │
+│  [status colour bar]   │  ← gauge strip at bottom
+└────────────────────────┘
+```
 
-**Rain**
-- Show today's total prominently
-- Add a small bar indicating how today's rain compares to a rolling 7-day or 30-day average
+**Cards to implement:**
 
-**Sensor fault banner**
-- Keep the DHT22 error alert but style it properly (sticky top bar, dismissible)
-- Extend it to show which sensor is faulty, since the system may add more sensors later
+| Card | Icon | Colour trigger | Gauge range |
+|---|---|---|---|
+| Temperature | Thermometer | Blue→green→orange→red based on °C | Site-specific min/max |
+| Humidity | Droplet | Green when 40–70%, yellow outside, red at extremes | 0–100% |
+| Wind Speed | Arrow/fan | Green→yellow→red as speed increases | 0–max recorded |
+| Wind Direction | Compass rose | Rotates to show direction; no colour coding | N/A |
+| Rain Today | Rain cloud | Blue intensity increases with quantity | 0–daily max |
+| CPU Temp | Chip | Green→yellow→red | 0–85°C (Pi limit) |
 
----
-
-### Phase 3 — Charts and Trends
-
-Use a lightweight charting library (Chart.js is the most practical — small, no build step needed).
-
-**Charts to add (all time-series for the selected day)**
-
-| Chart | Y-axis | Notes |
-|---|---|---|
-| Temperature | °C | Line chart |
-| Humidity | % RH | Line chart, same x-axis as temp (overlay or stacked) |
-| Wind Speed | raw units | Line chart with max gust highlighted |
-| Wind Direction | 0–360° | Scatter or polar area chart |
-| Rain accumulation | cumulative total | Step/area chart that only ever goes up during the day |
-| CPU Temperature | °C | Line chart (can be hidden by default) |
-
-**Chart interactions**
-- Hover tooltip showing exact value and timestamp
-- Click a point to highlight the raw reading in a detail panel
-- Zoom/pan for long days with dense data (Chart.js zoom plugin)
+**Wind Direction Card (special)**
+- Animated SVG compass rose
+- Arrow rotates to the stored degree value
+- Shows degree number + flow label using the station convention table above
+- e.g. "315° · N→S · NW"
 
 ---
 
-### Phase 4 — History and Navigation
+### Phase 3 — Graphs Tab (Default Tab)
 
-**Date picker**
-- Allow selecting any past date
-- Load data via the existing `/api/weather_data/<date>` and `/api/weather_summary/<date>` endpoints without a page reload
-- Show a "no data" state gracefully for dates before the station started
+**Graphs show the past 24 hours** of raw readings, not just "today".
+The x-axis always spans `now - 24h` to `now`, scrolling with time.
 
-**Week and month summary view**
-- A table or heatmap showing daily min/max/total for the last 7 or 30 days
-- Click a row to drill into that day's charts
+**Chart library:** Chart.js (loaded from local static file, CDN fallback)
 
-**CSV download button**
-- Surface the existing `/api/data_export/csv/<date>` endpoint as a visible button in the UI rather than a hidden URL
+**Charts to implement:**
+
+| Chart | Type | Y-axis | Extra overlays |
+|---|---|---|---|
+| Temperature | Line | °C | Dashed horizontal lines for daily min, max, avg |
+| Humidity | Line | % RH | Dashed lines for daily min, max, avg |
+| Wind Speed | Line + bar | speed units | Bar for each reading; line for rolling avg; dot for max gust |
+| Wind Direction | Scatter | 0–360° | Points coloured by speed; compass labels on y-axis (N/NE/E…) using station convention |
+| Rain Accumulation | Stepped area | cumulative mm | Resets at midnight; shaded fill |
+| Temp + Humidity | Dual-axis combo | °C / % | Overlaid on one chart to show correlation |
+
+**Min / Max / Avg overlays (on every chart)**
+- Dashed coloured line for daily average (cyan)
+- Thin horizontal bands marking daily min and max (faint red/blue fill)
+- Tooltip on hover: exact value, timestamp, and whether it was the day's min/max
+
+**Chart controls (small toolbar above each chart)**
+- Toggle min/max/avg overlays on/off
+- Zoom to last 1h / 6h / 12h / 24h
+- Pan left/right through data with mouse drag or swipe
+
+---
+
+### Phase 4 — History Sub-Tab
+
+The History tab lives in the same page as Graphs — switching tab does not reload the page.
+
+**Sub-tab layout:**
+
+```
+[ GRAPHS ]  [ HISTORY ]         ← tab switcher in the panel header
+```
+
+**History tab contents:**
+
+#### Date Navigator
+- Calendar date picker (HTML `<input type="date">`, no external library needed)
+- "Previous day" / "Next day" arrow buttons
+- Defaults to today; shows "TODAY" badge when on current date
+
+#### Daily Summary Table
+When a date is selected, fetch `/api/weather_summary/<date>` and show:
+
+| Metric | Min | Max | Avg | Total |
+|---|---|---|---|---|
+| Temperature | — | — | — | n/a |
+| Humidity | — | — | — | n/a |
+| Wind Speed | n/a | — | — | n/a |
+| Wind Direction | n/a | n/a | — | n/a |
+| Rain | n/a | n/a | n/a | — |
+
+Each cell colour-coded with the status palette.
+
+#### Historical Charts
+Same six charts as the Graphs tab, but populated with data from the selected date via `/api/weather_data/<date>`.
+Min/Max/Avg overlays automatically recalculate for the selected day.
+
+#### Download Controls
+Visible, labelled buttons — not hidden API URLs:
+
+```
+[ ↓ Download CSV for 2025-05-24 ]   [ ↓ Download JSON for 2025-05-24 ]
+```
+
+- CSV button calls existing `/api/data_export/csv/<date>`
+- JSON button calls `/api/weather_data/<date>` and triggers a browser download
+- Both buttons update their label when a new date is selected
+
+#### Multi-day Range Download (stretch goal)
+- "From / To" date range picker
+- Triggers a new backend endpoint `/api/data_export/csv/range/<start>/<end>`
+- Returns a single CSV with all records in range
 
 ---
 
 ### Phase 5 — Live Updates
 
-**Auto-refresh**
-- Poll `/api/weather_data` every 60 seconds (or whatever the sensor interval is)
-- Update the current-conditions cards and append new points to the charts without reloading the page
-- Show a "last updated X seconds ago" counter
+**Auto-refresh every 60 seconds**
+- Fetch `/api/weather_data` (today) on an interval
+- Update current-conditions cards in place (no page reload)
+- Append new data points to the open Graphs tab charts
+- "Last updated Xs ago" counter ticking in real time in the header
+
+**Live indicator dot**
+- Blinking green dot next to the clock while data is fresh
+- Turns amber if the last update was > 2 minutes ago
+- Turns red with a "SENSOR OFFLINE" label if no new data for > 5 minutes
 
 **Optional: Server-Sent Events (SSE)**
-- Flask supports SSE natively; this would push updates to the browser the moment a new reading is stored
-- More efficient than polling if the station records data frequently
+- Flask natively supports SSE via streaming responses
+- More efficient than polling; push data to the browser the moment a new row is written to the DB
+- Use as a future upgrade path once polling is working well
 
 ---
 
-### Phase 6 — Nice-to-Have Extras
+### Phase 6 — Sensor Health Panel
 
-| Feature | Description |
+Replace the basic red text alert with a proper status panel (inspired by the "LIFE-SUPPORT EQUIPMENT" section in the reference image):
+
+```
+┌─ SENSOR STATUS ─────────────────────────────────┐
+│  [●] DHT22 — Temp/Humidity    ONLINE             │
+│  [●] Arduino — Wind/Rain      ONLINE             │
+│  [●] CPU Temp                 ONLINE             │
+│  Last system check: 14:32:01                     │
+└──────────────────────────────────────────────────┘
+```
+
+- Each row has a coloured status dot (green/red/grey)
+- If a sensor has a fault, the dot turns red and the error message expands inline
+- Panel is always visible at the bottom of the page (or collapsible footer drawer)
+- On fault, a sticky banner also appears at the top (dismissible per session)
+
+---
+
+### Phase 7 — Polish and Extras
+
+| Feature | Detail |
 |---|---|
-| Dark mode | CSS `prefers-color-scheme` media query — free if the CSS is written with CSS variables |
-| Feels-like temperature | Calculate heat index or wind chill from temp + RH + wind and show alongside raw temperature |
-| UV / pressure | Placeholders for sensors that might be added later |
-| Multi-day rain total | Running 7-day and 30-day rain totals next to today's total |
-| Wind rose | Polar chart showing the distribution of wind directions over the day |
-| Export to JSON | Add a JSON download button alongside CSV |
-| Favicon | A small weather icon in the browser tab |
-| PWA / home screen | Add a web app manifest so the page can be pinned to a phone home screen |
+| Dark theme by default | CSS variables make light mode a one-line toggle; `prefers-color-scheme` respected |
+| Feels-like temperature | Heat index (temp + RH) shown as a sub-label on the temperature card |
+| Wind chill | Shown when temp < 15°C and wind speed > 0 |
+| Favicon | SVG weather station / sun icon in the browser tab |
+| PWA manifest | `manifest.json` + service worker so the page can be pinned to a phone home screen and loads offline (cached last state) |
+| Wind rose chart | Polar area chart on the Graphs tab showing directional frequency distribution for the past 24h, using the station-specific degree labels |
+| 7-day rain bar chart | Small bar chart on the rain card showing the last 7 days of daily totals |
+| Print / export view | A clean `@media print` stylesheet that removes chrome and prints the current conditions table neatly |
 
 ---
 
-### Implementation Notes
+## Implementation Notes
 
-**Keep the JSON API intact** — all new UI should consume the existing endpoints. No changes to `/api/weather_data`, `/api/weather_summary`, or `/api/data_export/csv`.
+**Keep the JSON API intact** — all new UI consumes existing endpoints. No breaking changes to `/api/weather_data`, `/api/weather_summary`, or `/api/data_export/csv`.
 
-**No build tools needed** — Chart.js and any CSS framework can be loaded from a local static file (or CDN fallback). This keeps deployment simple on the Raspberry Pi.
+**Add one new endpoint:**
+- `GET /api/weather_data/last24h` — returns all records from `now - 24 hours` to `now` across midnight boundaries (the existing endpoints are date-bounded)
+- `GET /api/data_export/csv/range/<start>/<end>` — multi-day CSV for the History download feature
 
-**Progressive enhancement** — the page should still show the data table if JavaScript is disabled or fails to load, so the information is never completely inaccessible.
+**No build tools** — Chart.js and CSS served as static files. No npm, webpack, or transpilation. Keeps deployment simple on the Raspberry Pi.
 
-**Performance** — the Pi has limited CPU. Keep JS minimal; avoid frameworks that require heavy client-side rendering.
+**Progressive enhancement** — if JS is disabled, the page falls back to a rendered server-side data table. Data is never inaccessible.
+
+**Performance on the Pi** — avoid React/Vue/Angular. Vanilla JS + Chart.js is well within the Pi's capability. Keep the number of simultaneous open charts to three or fewer if performance is a concern.
+
+**File structure target:**
+```
+weather_web/
+├── app.py
+├── web_settings.py
+├── requirements.txt
+├── templates/
+│   ├── base.html          ← dark-theme shell, nav, header, footer
+│   ├── dashboard.html     ← main SPA page (extends base)
+│   └── error.html
+├── static/
+│   ├── css/
+│   │   └── dashboard.css  ← CSS variables + grid layout
+│   └── js/
+│       ├── dashboard.js   ← card updates, live refresh loop
+│       ├── charts.js      ← Chart.js setup and data loading
+│       ├── history.js     ← history tab, date picker, download buttons
+│       └── compass.js     ← SVG compass rose with station degree convention
+└── install/
+    ├── weather_web.nginx
+    └── weather_web.service
+```
