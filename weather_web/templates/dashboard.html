@@ -81,6 +81,22 @@
         <div class="card-gauge"><div class="card-gauge-bar" id="gauge-rain"></div></div>
       </div>
 
+      <div class="card" id="card-lightning">
+        <div class="card-header">
+          <svg class="card-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polyline points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
+          </svg>
+          <span class="card-label">LIGHTNING</span>
+        </div>
+        <div class="card-value"><span id="cur-lightning">CLEAR</span><span class="card-unit" id="lightning-unit"></span></div>
+        <div class="card-sublabel" id="lightning-trend">no activity</div>
+        <div class="card-stats">
+          <span>TODAY <strong id="lightning-count-today">0</strong></span>
+          <span id="lightning-last-ago"></span>
+        </div>
+        <div class="card-gauge"><div class="card-gauge-bar" id="gauge-lightning"></div></div>
+      </div>
+
       <div class="card" id="card-cpu">
         <div class="card-header">
           <svg class="card-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -149,18 +165,28 @@
         <div class="chart-wrap chart-full">
           <div class="chart-title">TEMPERATURE (°C)</div>
           <div class="chart-canvas-wrap"><canvas id="chart-temp"></canvas></div>
+          <div class="wind-dir-legend">
+            <span class="wdl-item"><span class="wdl-dot" style="background:#ff8f00"></span>Air temp</span>
+            <span class="wdl-item"><span class="wdl-dot" style="background:#7986cb"></span>CPU temp</span>
+          </div>
         </div>
         <div class="chart-wrap">
           <div class="chart-title">HUMIDITY (% RH)</div>
           <div class="chart-canvas-wrap"><canvas id="chart-rh"></canvas></div>
         </div>
         <div class="chart-wrap">
-          <div class="chart-title">WIND SPEED (kph)</div>
+          <div class="chart-title">WIND SPEED (kph) — colour = direction</div>
           <div class="chart-canvas-wrap"><canvas id="chart-wind-speed"></canvas></div>
-        </div>
-        <div class="chart-wrap">
-          <div class="chart-title">WIND DIRECTION</div>
-          <div class="chart-canvas-wrap"><canvas id="chart-wind-dir"></canvas></div>
+          <div class="wind-dir-legend">
+            <span class="wdl-item"><span class="wdl-dot" style="background:rgba(33,150,243,0.9)"></span>N</span>
+            <span class="wdl-item"><span class="wdl-dot" style="background:rgba(0,188,212,0.9)"></span>NE</span>
+            <span class="wdl-item"><span class="wdl-dot" style="background:rgba(76,175,80,0.9)"></span>E</span>
+            <span class="wdl-item"><span class="wdl-dot" style="background:rgba(205,220,57,0.9)"></span>SE</span>
+            <span class="wdl-item"><span class="wdl-dot" style="background:rgba(255,152,0,0.9)"></span>S</span>
+            <span class="wdl-item"><span class="wdl-dot" style="background:rgba(244,67,54,0.9)"></span>SW</span>
+            <span class="wdl-item"><span class="wdl-dot" style="background:rgba(156,39,176,0.9)"></span>W</span>
+            <span class="wdl-item"><span class="wdl-dot" style="background:rgba(103,58,183,0.9)"></span>NW</span>
+          </div>
         </div>
         <div class="chart-wrap">
           <div class="chart-title">RAIN ACCUMULATION (mm)</div>
@@ -169,6 +195,10 @@
         <div class="chart-wrap">
           <div class="chart-title">WIND ROSE (24h)</div>
           <div class="chart-canvas-wrap"><canvas id="chart-wind-rose"></canvas></div>
+        </div>
+        <div class="chart-wrap chart-full">
+          <div class="chart-title">STORM DISTANCE (km) — lower = closer</div>
+          <div class="chart-canvas-wrap"><canvas id="chart-lightning"></canvas></div>
         </div>
       </div>
     </div>
@@ -264,6 +294,12 @@
       <span class="sensor-name">CPU Temperature</span>
       <span class="sensor-status-text" id="status-cpu">—</span>
       <span class="sensor-msg" id="msg-cpu"></span>
+    </div>
+    <div class="sensor-row" id="sensor-lightning">
+      <span class="sensor-dot" id="dot-lightning"></span>
+      <span class="sensor-name">SEN0290 — Lightning</span>
+      <span class="sensor-status-text" id="status-lightning">—</span>
+      <span class="sensor-msg" id="msg-lightning"></span>
     </div>
   </div>
   <div class="sensor-check-time">Last check: <span id="sensor-check-time">—</span></div>

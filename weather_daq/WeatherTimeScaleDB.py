@@ -33,6 +33,17 @@ class WeatherTimeScaleDB:
 				cur.execute("""
 			                SELECT create_hypertable('weather', 'timestamp', if_not_exists => TRUE);
 			            """)
+				cur.execute("""
+				            CREATE TABLE IF NOT EXISTS lightning_strikes (
+				                timestamp   TIMESTAMPTZ,
+				                event_type  TEXT,
+				                distance_km INTEGER,
+				                energy      INTEGER
+				            );
+				            """)
+				cur.execute("""
+				            SELECT create_hypertable('lightning_strikes', 'timestamp', if_not_exists => TRUE);
+				            """)
 				self.connection.commit()
 
 			except psycopg2.Error as e:
@@ -59,6 +70,22 @@ class WeatherTimeScaleDB:
 				            ))
 				self.connection.commit()
 			except psycopg2.Error as e:
+				self.connection.rollback()
+				print(e)
+		return True
+
+	def write_lightning_event(self, record):
+		if not self.connection:
+			return None
+		with self.connection.cursor() as cur:
+			try:
+				cur.execute(
+					"INSERT INTO lightning_strikes (timestamp, event_type, distance_km, energy) "
+					"VALUES (%s, %s, %s, %s)",
+					(record.timestamp, record.event_type, record.distance_km, record.energy),
+				)
+				self.connection.commit()
+			except Exception as e:
 				self.connection.rollback()
 				print(e)
 		return True

@@ -84,9 +84,11 @@ async function loadData() {
   setLiveStatus('connecting');
   try {
     const today = new Date().toISOString().slice(0, 10);
-    const [data24h, summary] = await Promise.all([
+    const [data24h, summary, lightningStatus, lightningStrikes] = await Promise.all([
       fetch('/api/weather_data/last24h').then(r => r.json()),
       fetch(`/api/weather_summary/${today}`).then(r => r.json()),
+      fetch('/api/lightning/status').then(r => r.json()).catch(() => null),
+      fetch('/api/lightning/recent?n=100').then(r => r.json()).catch(() => []),
     ]);
 
     if (!data24h.length) { setLiveStatus('stale'); return; }
@@ -98,6 +100,8 @@ async function loadData() {
     const latest = data24h[data24h.length - 1];
     updateCards(latest, summary);
     weatherCharts.update(data24h, summary);
+    if (lightningStatus) updateLightningCard(lightningStatus);
+    if (lightningStrikes) weatherCharts.updateLightning(lightningStrikes);
   } catch (e) {
     setLiveStatus('error');
   }
@@ -161,12 +165,13 @@ function updateCards(latest, summary) {
   const dp = dewPoint(temp, rh);
   document.getElementById('dew-point').textContent = dp != null ? `Dew point ${fmt1(dp)}°C` : '';
 
-  // Rain (show cumulative today)
-  const rainSt = getRainStatus(totalRain);
-  document.getElementById('cur-rain').textContent   = fmt1(totalRain);
-  document.getElementById('total-rain').textContent = fmt1(totalRain);
+  // Rain (show cumulative today — clamp to 0, sensor noise can produce tiny negatives)
+  const rainDisplay = Math.max(0, totalRain || 0);
+  const rainSt = getRainStatus(rainDisplay);
+  document.getElementById('cur-rain').textContent   = fmt1(rainDisplay);
+  document.getElementById('total-rain').textContent = fmt1(rainDisplay);
   setCardStatus('card-rain', rainSt);
-  setGauge('gauge-rain', totalRain || 0, 0, 50, rainSt);
+  setGauge('gauge-rain', rainDisplay, 0, 50, rainSt);
 
   // CPU
   const cpuSt = getCPUStatus(cpu);
@@ -185,6 +190,68 @@ function updateCards(latest, summary) {
     compass.update(wdir);
     document.getElementById('wind-dir-label').textContent = getWindDirLabel(wdir);
   }
+}
+
+// ── Lightning card ────────────────────────────────────────
+function updateLightningCard(s) {
+  const valEl    = document.getElementById('cur-lightning');
+  const unitEl   = document.getElementById('lightning-unit');
+  const trendEl  = document.getElementById('lightning-trend');
+  const countEl  = document.getElementById('lightning-count-today');
+  const lastEl   = document.getElementById('lightning-last-ago');
+  if (!valEl) return;
+
+  const dist  = s.last_distance_km;
+  const trend = s.storm_trend || 'clear';
+  const count = s.strike_count_24h || 0;
+
+  // Card value
+  if (dist != null) {
+    valEl.textContent  = dist === 1 ? 'OVERHEAD' : dist;
+    unitEl.textContent = dist === 1 ? '' : ' km';
+  } else {
+    valEl.textContent  = 'CLEAR';
+    unitEl.textContent = '';
+  }
+
+  // Trend sublabel
+  const trendLabels = {
+    approaching: 'STORM APPROACHING',
+    retreating:  'STORM RETREATING',
+    overhead:    'STORM OVERHEAD',
+    stationary:  'STORM STATIONARY',
+    clear:       'no recent activity',
+    unknown:     'monitoring...',
+  };
+  trendEl.textContent = trendLabels[trend] || trend;
+
+  // Stats
+  countEl.textContent = count;
+  if (s.last_strike_time) {
+    const secs = Math.round((Date.now() - new Date(s.last_strike_time).getTime()) / 1000);
+    let ago;
+    if (secs < 60)        ago = secs + 's ago';
+    else if (secs < 3600) ago = Math.floor(secs / 60) + 'm ago';
+    else                  ago = Math.floor(secs / 3600) + 'h ago';
+    lastEl.textContent = 'last ' + ago;
+  } else {
+    lastEl.textContent = '';
+  }
+
+  const st = getLightningStatus(dist, trend);
+  setCardStatus('card-lightning', st);
+  // Gauge: invert distance — close = full bar; no activity = empty
+  const gaugeVal = dist != null ? Math.max(0, 40 - dist) : 0;
+  setGauge('gauge-lightning', gaugeVal, 0, 39, st);
+
+}
+
+function getLightningStatus(dist, trend) {
+  if (dist == null)    return 'ok';
+  if (dist <= 5)       return 'critical';
+  if (dist <= 12)      return 'alert';
+  if (trend === 'approaching') return 'caution';
+  return 'ok';
 }
 
 // ── Status helpers ────────────────────────────────────────
@@ -259,7 +326,7 @@ async function loadSensorStatus() {
 
 function updateSensorPanel(data) {
   const sensors = data.sensors || {};
-  ['dht22', 'arduino', 'cpu'].forEach(key => {
+  ['dht22', 'arduino', 'cpu', 'lightning'].forEach(key => {
     const info = sensors[key] || { status: 'unknown', message: '' };
     const dot  = document.getElementById('dot-' + key);
     const stEl = document.getElementById('status-' + key);

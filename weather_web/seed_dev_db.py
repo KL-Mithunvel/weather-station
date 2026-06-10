@@ -18,7 +18,17 @@ def seed():
             wind_speed REAL, wind_dir INTEGER, rain_qty REAL
         )
     """)
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS lightning_strikes (
+            id          INTEGER PRIMARY KEY AUTOINCREMENT,
+            timestamp   TIMESTAMP,
+            event_type  TEXT,
+            distance_km INTEGER,
+            energy      INTEGER
+        )
+    """)
     conn.execute("DELETE FROM weather")
+    conn.execute("DELETE FROM lightning_strikes")
 
     now = datetime.datetime.now().replace(second=0, microsecond=0)
     start = now - datetime.timedelta(hours=48)
@@ -58,9 +68,27 @@ def seed():
         "INSERT INTO weather (timestamp, temp, rh, cpu_temp, wind_speed, wind_dir, rain_qty) VALUES (?,?,?,?,?,?,?)",
         records
     )
+
+    # Seed a realistic storm: arrived 8h ago at 40km, closed to 6km over 2h, then retreated
+    storm_distances = [40, 34, 27, 20, 17, 12, 8, 6, 8, 12, 17, 24, 34, 40]
+    lightning_records = []
+    storm_start = now - datetime.timedelta(hours=8)
+    for i, dist in enumerate(storm_distances):
+        ts = storm_start + datetime.timedelta(minutes=i * 22)
+        energy = random.randint(60000, 500000)
+        lightning_records.append((ts.strftime('%Y-%m-%d %H:%M:%S'), 'lightning', dist, energy))
+        # occasionally add a disturber near the peak
+        if dist <= 10 and random.random() < 0.4:
+            ts2 = ts + datetime.timedelta(minutes=3)
+            lightning_records.append((ts2.strftime('%Y-%m-%d %H:%M:%S'), 'disturber', None, None))
+
+    conn.executemany(
+        "INSERT INTO lightning_strikes (timestamp, event_type, distance_km, energy) VALUES (?,?,?,?)",
+        lightning_records
+    )
     conn.commit()
     conn.close()
-    print(f"Seeded {len(records)} records into {DB_PATH}")
+    print(f"Seeded {len(records)} weather records and {len(lightning_records)} lightning events into {DB_PATH}")
 
 
 if __name__ == '__main__':

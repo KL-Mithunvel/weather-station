@@ -143,6 +143,7 @@ class WeatherCompass {
 }
 
 function getWindDirLabel(degrees) {
-  const info = getDirInfo(degrees);
-  return `${Math.round(degrees)}° · ${info.label} · ${info.flow}`;
+  const info     = getDirInfo(degrees);
+  const fromInfo = getDirInfo((degrees + 180) % 360);
+  return `${Math.round(degrees)}° · →${info.label} · from ${fromInfo.label}`;
 }

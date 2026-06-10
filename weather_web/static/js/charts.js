@@ -66,6 +66,30 @@ function speedToColor(speed) {
   return 'rgba(244,67,54,.7)';
 }
 
+const DIR_COLORS_WIND = [
+  'rgba(33,150,243,0.8)',   // N
+  'rgba(0,188,212,0.8)',    // NE
+  'rgba(76,175,80,0.8)',    // E
+  'rgba(205,220,57,0.8)',   // SE
+  'rgba(255,152,0,0.8)',    // S
+  'rgba(244,67,54,0.8)',    // SW
+  'rgba(156,39,176,0.8)',   // W
+  'rgba(103,58,183,0.8)',   // NW
+];
+
+function _distanceColor(km) {
+  if (km == null) return 'rgba(55,71,79,0.6)';
+  if (km <= 5)  return 'rgba(244,67,54,0.9)';   // red — overhead/critical
+  if (km <= 10) return 'rgba(255,109,0,0.9)';   // orange — close
+  if (km <= 20) return 'rgba(255,234,0,0.9)';   // yellow — moderate
+  return        'rgba(0,230,118,0.7)';           // green — distant
+}
+
+function dirToColor(deg) {
+  if (deg == null) return 'rgba(55,71,79,0.5)';
+  return DIR_COLORS_WIND[Math.round(((deg % 360) + 360) % 360 / 45) % 8];
+}
+
 class WeatherCharts {
   constructor() {
     this.charts = {};
@@ -78,12 +102,12 @@ class WeatherCharts {
   }
 
   _init() {
-    this.charts.temp      = this._makeChart('chart-temp',      this._tempConfig());
-    this.charts.rh        = this._makeChart('chart-rh',        this._rhConfig());
+    this.charts.temp      = this._makeChart('chart-temp',       this._tempConfig());
+    this.charts.rh        = this._makeChart('chart-rh',         this._rhConfig());
     this.charts.windSpeed = this._makeChart('chart-wind-speed', this._windSpeedConfig());
-    this.charts.windDir   = this._makeChart('chart-wind-dir',  this._windDirConfig());
-    this.charts.rain      = this._makeChart('chart-rain',      this._rainConfig());
+    this.charts.rain      = this._makeChart('chart-rain',       this._rainConfig());
     this.charts.windRose  = this._makeWindRoseChart('chart-wind-rose');
+    this.charts.lightning = this._makeChart('chart-lightning',  this._lightningConfig());
   }
 
   _makeChart(id, config) {
@@ -141,9 +165,10 @@ class WeatherCharts {
     const labels = filtered.map(r => r.timestamp.replace(' ', 'T'));
     const n = filtered.length;
 
-    // Temperature
+    // Temperature + CPU
     if (this.charts.temp) {
       const temps = filtered.map(r => r.temp);
+      const cpus  = filtered.map(r => r.cpu_temp);
       const ds = this.charts.temp.data.datasets;
       ds[0].data = labels.map((l, i) => ({ x: l, y: temps[i] }));
       if (summary) {
@@ -154,6 +179,7 @@ class WeatherCharts {
       ds[1].hidden = !this.overlays.min;
       ds[2].hidden = !this.overlays.max;
       ds[3].hidden = !this.overlays.avg;
+      ds[4].data = labels.map((l, i) => ({ x: l, y: cpus[i] }));
       this.charts.temp.update('none');
     }
 
@@ -173,11 +199,15 @@ class WeatherCharts {
       this.charts.rh.update('none');
     }
 
-    // Wind Speed
+    // Wind Speed — bars coloured by wind direction
     if (this.charts.windSpeed) {
       const speeds = filtered.map(r => r.wind_speed);
+      const dirs   = filtered.map(r => r.wind_dir);
+      const colors = dirs.map(d => dirToColor(d));
       const ds = this.charts.windSpeed.data.datasets;
-      ds[0].data = labels.map((l, i) => ({ x: l, y: speeds[i] }));
+      ds[0].data            = labels.map((l, i) => ({ x: l, y: speeds[i] }));
+      ds[0].backgroundColor = colors;
+      ds[0].borderColor     = colors;
       if (summary) {
         ds[1].data = labels.map(l => ({ x: l, y: summary.wind_speed.max }));
         ds[2].data = labels.map(l => ({ x: l, y: summary.wind_speed.avg }));
@@ -187,18 +217,10 @@ class WeatherCharts {
       this.charts.windSpeed.update('none');
     }
 
-    // Wind Direction scatter
-    if (this.charts.windDir) {
-      const ds = this.charts.windDir.data.datasets;
-      ds[0].data = filtered.map(r => ({ x: r.timestamp.replace(' ', 'T'), y: r.wind_dir }));
-      ds[0].backgroundColor = filtered.map(r => speedToColor(r.wind_speed));
-      this.charts.windDir.update('none');
-    }
-
     // Rain accumulation
     if (this.charts.rain) {
       let cum = 0;
-      const cumData = filtered.map(r => { cum += (r.rain_qty || 0); return parseFloat(cum.toFixed(2)); });
+      const cumData = filtered.map(r => { cum += Math.max(0, r.rain_qty || 0); return parseFloat(cum.toFixed(2)); });
       this.charts.rain.data.datasets[0].data = labels.map((l, i) => ({ x: l, y: cumData[i] }));
       this.charts.rain.update('none');
     }
@@ -223,10 +245,11 @@ class WeatherCharts {
     return {
       type: 'line',
       data: { datasets: [
-        { label: 'Temp °C', data: [], borderColor: '#ff8f00', backgroundColor: 'rgba(255,143,0,.1)', fill: true, tension: 0.3, pointRadius: 1.5, borderWidth: 2 },
-        { label: 'Min',     data: [], borderColor: CHART_COLORS.min, borderDash:[5,3], pointRadius:0, borderWidth:1, fill:false },
-        { label: 'Max',     data: [], borderColor: CHART_COLORS.max, borderDash:[5,3], pointRadius:0, borderWidth:1, fill:false },
-        { label: 'Avg',     data: [], borderColor: CHART_COLORS.avg, borderDash:[8,3], pointRadius:0, borderWidth:1.5, fill:false },
+        { label: 'Air °C',  data: [], borderColor: '#ff8f00', backgroundColor: 'rgba(255,143,0,.1)', fill: true,  tension: 0.3, pointRadius: 1.5, borderWidth: 2 },
+        { label: 'Min',     data: [], borderColor: CHART_COLORS.min, borderDash:[5,3],  pointRadius:0, borderWidth:1,   fill:false },
+        { label: 'Max',     data: [], borderColor: CHART_COLORS.max, borderDash:[5,3],  pointRadius:0, borderWidth:1,   fill:false },
+        { label: 'Avg',     data: [], borderColor: CHART_COLORS.avg, borderDash:[8,3],  pointRadius:0, borderWidth:1.5, fill:false },
+        { label: 'CPU °C',  data: [], borderColor: '#7986cb', backgroundColor: 'transparent', fill: false, tension: 0.3, pointRadius: 1, borderWidth: 1.5, borderDash: [4, 2] },
       ]},
       options: { ...BASE_OPTS, scales: { ...BASE_OPTS.scales, y: { ...BASE_OPTS.scales.y, title: { display: false } } } }
     };
@@ -257,36 +280,6 @@ class WeatherCharts {
     };
   }
 
-  _windDirConfig() {
-    const DIR_LABELS = ['N(NE→SW)','NE','E(SE→NW)','SE','S(SW→NE)','SW','W(NW→SE)','NW'];
-    return {
-      type: 'scatter',
-      data: { datasets: [{
-        label: 'Wind Direction',
-        data: [],
-        backgroundColor: [],
-        pointRadius: 3,
-        pointHoverRadius: 5,
-      }]},
-      options: {
-        ...BASE_OPTS,
-        scales: {
-          ...BASE_OPTS.scales,
-          y: {
-            ...BASE_OPTS.scales.y,
-            min: 0, max: 360,
-            ticks: {
-              ...BASE_OPTS.scales.y.ticks,
-              stepSize: 45,
-              callback: v => DIR_LABELS[v / 45] ?? '',
-            }
-          }
-        },
-        plugins: { ...BASE_OPTS.plugins, legend: { display: false } }
-      }
-    };
-  }
-
   _rainConfig() {
     return {
       type: 'line',
@@ -301,6 +294,62 @@ class WeatherCharts {
         borderWidth: 2,
       }]},
       options: { ...BASE_OPTS, scales: { ...BASE_OPTS.scales, y: { ...BASE_OPTS.scales.y, min: 0 } } }
+    };
+  }
+
+  updateLightning(strikes) {
+    if (!this.charts.lightning) return;
+    const points = strikes
+      .filter(s => s.event_type === 'lightning' && s.distance_km != null)
+      .map(s => ({ x: s.timestamp.replace(' ', 'T'), y: s.distance_km }));
+    const colors = points.map(p => _distanceColor(p.y));
+    const ds = this.charts.lightning.data.datasets[0];
+    ds.data            = points;
+    ds.backgroundColor = colors;
+    ds.pointBorderColor = colors;
+    this.charts.lightning.update('none');
+  }
+
+  _lightningConfig() {
+    return {
+      type: 'scatter',
+      data: { datasets: [{
+        label: 'Strike (km)',
+        data: [],
+        backgroundColor: [],
+        pointBorderColor: [],
+        pointRadius: 7,
+        pointHoverRadius: 9,
+        showLine: true,
+        borderColor: 'rgba(255,193,7,0.25)',
+        borderWidth: 1,
+        tension: 0,
+      }]},
+      options: {
+        ...BASE_OPTS,
+        scales: {
+          x: { ...BASE_OPTS.scales.x },
+          y: {
+            ...BASE_OPTS.scales.y,
+            min: 0,
+            max: 42,
+            title: { display: true, text: 'km', color: CHART_COLORS.text,
+                     font: { family: 'JetBrains Mono, monospace', size: 10 } },
+          }
+        },
+        plugins: {
+          ...BASE_OPTS.plugins,
+          tooltip: {
+            ...BASE_OPTS.plugins.tooltip,
+            callbacks: {
+              label: ctx => {
+                const km = ctx.parsed.y;
+                return `  ${km === 1 ? 'overhead (<1 km)' : km + ' km away'}`;
+              }
+            }
+          }
+        }
+      }
     };
   }
 

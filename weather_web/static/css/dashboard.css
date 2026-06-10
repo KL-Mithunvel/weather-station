@@ -358,6 +358,27 @@ button { cursor: pointer; background: none; border: none; }
   position: relative;
   height: 160px;
 }
+.wind-dir-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 0.9rem;
+  margin-top: 0.45rem;
+}
+.wdl-item {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-family: var(--font-mono);
+  font-size: 0.58rem;
+  color: var(--color-text-dim);
+}
+.wdl-dot {
+  display: inline-block;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
 
 /* ─── History tab ────────────────────────────────────────── */
 .date-nav {

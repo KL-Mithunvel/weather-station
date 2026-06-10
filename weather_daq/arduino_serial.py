@@ -39,7 +39,7 @@ class ArduinoSerial:
 
             if last_line:
                 values = [round(float(x), 2) for x in last_line.split(',')]
-                cur_rain_val = values[2] - (self.last_rain_value if self.last_rain_value is not None else values[2])
+                cur_rain_val = max(0.0, values[2] - (self.last_rain_value if self.last_rain_value is not None else values[2]))
                 self.last_rain_value = values[2]
                 return {"wind_dir": values[0], "wind_speed": values[1], "rain_qty": cur_rain_val}
             return None
@@ -52,3 +52,4 @@ class ArduinoSerial:
         self.close()
         time.sleep(2)
         self.connect()
+        self.last_rain_value = None  # counter resets to 0 after reconnect; treat next reading as baseline

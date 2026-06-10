@@ -5,6 +5,14 @@ class WeatherRecord:
     def __init__(self):
         self.timestamp = self.temp = self.rh = self.cpu_temp = self.wind_speed = self.wind_dir = self.rain_qty = None
 
+
+class LightningRecord:
+    def __init__(self):
+        self.timestamp   = None
+        self.event_type  = None   # 'lightning' | 'noise' | 'disturber'
+        self.distance_km = None
+        self.energy      = None
+
     def __str__(self):
         return (f"WeatherRecord(timestamp={self.timestamp}, temp={self.temp}, rh={self.rh}, cpu_temp={self.cpu_temp}, "
                 f"wind_speed={self.wind_speed}, wind_dir={self.wind_dir}, rain_qty={self.rain_qty})")
@@ -47,6 +55,15 @@ class WeatherDB:
                     total_rain_qty REAL
                 )
             """)
+            self.connection.execute("""
+                CREATE TABLE IF NOT EXISTS lightning_strikes (
+                    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+                    timestamp   TIMESTAMP,
+                    event_type  TEXT,
+                    distance_km INTEGER,
+                    energy      INTEGER
+                )
+            """)
 
 
     def write_record(self, weather_record: WeatherRecord):
@@ -73,7 +90,7 @@ class WeatherDB:
                     MAX(wind_speed)       AS max_speed,
                     AVG(wind_speed)       AS avg_wind_speed,
                     AVG(wind_dir)         AS avg_wind_dir,
-                    SUM(rain_qty)         AS total_rain_qty,
+                    SUM(CASE WHEN rain_qty > 0 THEN rain_qty ELSE 0 END) AS total_rain_qty,
                     MIN(cpu_temp) AS min_cpu_temp,
                     MAX(cpu_temp) AS max_cpu_temp,
                     AVG(cpu_temp) AS avg_cpu_temp
@@ -148,6 +165,47 @@ class WeatherDB:
         """
         cursor = self.connection.cursor()
         cursor.execute(csql, (start_date, end_date))
+        return cursor.fetchall()
+
+    def write_lightning_event(self, record: 'LightningRecord'):
+        if not self.connection:
+            raise RuntimeError("Database connection not established")
+        with self.connection:
+            self.connection.execute(
+                "INSERT INTO lightning_strikes (timestamp, event_type, distance_km, energy) VALUES (?, ?, ?, ?)",
+                (record.timestamp, record.event_type, record.distance_km, record.energy),
+            )
+
+    def get_lightning_recent(self, n: int = 20) -> list:
+        self.check_connection()
+        cursor = self.connection.cursor()
+        cursor.execute(
+            "SELECT id, timestamp, event_type, distance_km, energy "
+            "FROM lightning_strikes ORDER BY id DESC LIMIT ?", (n,)
+        )
+        return cursor.fetchall()
+
+    def get_lightning_last_hours(self, hours: int = 24) -> list:
+        self.check_connection()
+        cursor = self.connection.cursor()
+        cursor.execute(
+            "SELECT id, timestamp, event_type, distance_km, energy "
+            "FROM lightning_strikes "
+            "WHERE timestamp >= datetime('now', ?) "
+            "ORDER BY timestamp ASC",
+            (f"-{hours} hours",),
+        )
+        return cursor.fetchall()
+
+    def get_lightning_today(self) -> list:
+        self.check_connection()
+        cursor = self.connection.cursor()
+        cursor.execute(
+            "SELECT id, timestamp, event_type, distance_km, energy "
+            "FROM lightning_strikes "
+            "WHERE DATE(timestamp) = DATE('now') "
+            "ORDER BY timestamp ASC"
+        )
         return cursor.fetchall()
 
     def close(self):

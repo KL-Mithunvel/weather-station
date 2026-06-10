@@ -20,3 +20,7 @@ RAIN_PIN = None
 
 SERIAL_PORT = '/dev/ttyACM0'
 BAUD_RATE = 115200
+
+LIGHTNING_I2C_ADDR = 0x03   # default (both DIP switches ON)
+LIGHTNING_I2C_BUS  = 1      # /dev/i2c-1 on all modern Pis
+LIGHTNING_IRQ_PIN  = 17     # BCM GPIO17, physical pin 11
