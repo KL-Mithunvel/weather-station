@@ -37,8 +37,7 @@ print("=" * 50)
 print("  Weather Station Dev Server")
 print("  http://localhost:8000/dashboard")
 print("  Press Ctrl+C to stop")
-print("=" * 50)
-
+print("=" * 50)`
 os.chdir(os.path.dirname(os.path.abspath(__file__)))
 import app as weather_app
 weather_app.app.run(host="127.0.0.1", port=8000, debug=False, use_reloader=False)

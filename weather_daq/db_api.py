@@ -26,7 +26,10 @@ class WeatherDB:
         self.connect()
 
     def connect(self):
-        self.connection = sqlite3.connect(self.db_path)
+        self.connection = sqlite3.connect(self.db_path, timeout=10)
+        # WAL allows concurrent readers (web app) while the DAQ writes,
+        # instead of throwing "database is locked" under contention.
+        self.connection.execute("PRAGMA journal_mode=WAL")
         with self.connection:
             self.connection.execute("""
                 CREATE TABLE IF NOT EXISTS weather (

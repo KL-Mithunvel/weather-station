@@ -208,12 +208,16 @@ python acquire.py          # needs real Pi hardware
 
 # weather_web
 cd weather_web
-python app.py              # runs on port 8000 in debug mode
+python app.py                          # binds 127.0.0.1:8000, debug off by default
+FLASK_DEBUG=1 python app.py            # opt-in debugger, also restricted to 127.0.0.1
 ```
+For the full dashboard experience with sample data, use `run_local.py` instead (auto-seeds dev DB, opens browser).
 
 ### Security note
 - Date strings are validated before being passed to SQLite queries (`validate_date_str` in `app.py:12`, parameterised queries throughout `db_api.py`).
 - Never expose raw DB credentials in settings files committed to the repo.
+- `app.py`'s `__main__` block never binds the Werkzeug debugger to a non-loopback address — debug mode + `0.0.0.0` would expose remote code execution via the interactive debugger. Production always runs through gunicorn (`install/weather_web.service`), which never hits this code path.
+- Unhandled exceptions are logged with full tracebacks to `/var/log/weather/weather_web.log` (rotated daily, 7-day retention — same scheme as `weather_daq`) via a global `@app.errorhandler(Exception)`, and rendered as a generic error page/JSON instead of leaking stack traces.
 
 ### Deployment path on Pi
 ```

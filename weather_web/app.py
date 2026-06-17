@@ -1,4 +1,5 @@
-from flask import Flask, Response, jsonify, redirect, request, url_for, render_template
+from flask import Flask, Response, g, jsonify, redirect, request, url_for, render_template
+from werkzeug.exceptions import HTTPException
 import csv
 import io
 import json
@@ -9,6 +10,7 @@ import datetime
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 from weather_daq import db_api
 import web_settings
+from web_log import logger
 
 COLS = ['id', 'timestamp', 'temp', 'rh', 'cpu_temp', 'wind_speed', 'wind_dir', 'rain_qty']
 LIGHTNING_COLS = ['id', 'timestamp', 'event_type', 'distance_km', 'energy']
@@ -111,6 +113,40 @@ def assess_sensor_health(last_row, dht_status, lightning_i2c_status=None):
 app = Flask(__name__)
 
 
+def get_db():
+    if 'weather_db' not in g:
+        g.weather_db = db_api.WeatherDB(web_settings.DB_SETTINGS)
+    return g.weather_db
+
+
+@app.teardown_appcontext
+def close_db(exception=None):
+    weather_db = g.pop('weather_db', None)
+    if weather_db is not None:
+        weather_db.close()
+
+
+@app.errorhandler(404)
+def handle_not_found(e):
+    if request.path.startswith('/api/'):
+        return jsonify(error="Not found"), 404
+    return render_template('error.html', code=404, message="Page not found"), 404
+
+
+@app.errorhandler(Exception)
+def handle_exception(e):
+    if isinstance(e, HTTPException):
+        code = e.code
+        message = e.description
+    else:
+        code = 500
+        message = "Internal server error"
+    logger.error(f"Unhandled exception on {request.method} {request.path}: {e}", exc_info=True)
+    if request.path.startswith('/api/'):
+        return jsonify(error=message), code
+    return render_template('error.html', code=code, message=message), code
+
+
 @app.route('/')
 def index():
     return redirect(url_for('dashboard'))
@@ -128,7 +164,7 @@ def home():
 
 @app.route('/api/weather_data/last24h')
 def api_last24h():
-    weather_db = db_api.WeatherDB(web_settings.DB_SETTINGS)
+    weather_db = get_db()
     rows = weather_db.get_last24h_records()
     return jsonify([dict(zip(COLS, row)) for row in rows])
 
@@ -139,7 +175,7 @@ def api_weather_data(date_str):
     if date_str and not validate_date_str(date_str):
         return "Invalid date format. Use YYYY-MM-DD", 400
     date_str = date_str or datetime.date.today().strftime("%Y-%m-%d")
-    weather_db = db_api.WeatherDB(web_settings.DB_SETTINGS)
+    weather_db = get_db()
     rows = weather_db.get_records_by_date(date_str)
     return jsonify([dict(zip(COLS, row)) for row in rows])
 
@@ -148,13 +184,13 @@ def api_weather_data(date_str):
 def api_weather_summary(date_str):
     if not validate_date_str(date_str):
         return "Invalid date format. Use YYYY-MM-DD", 400
-    weather_db = db_api.WeatherDB(web_settings.DB_SETTINGS)
+    weather_db = get_db()
     return jsonify(weather_db.get_daily_summary(date_str))
 
 
 @app.route('/api/sensor_status')
 def api_sensor_status():
-    weather_db = db_api.WeatherDB(web_settings.DB_SETTINGS)
+    weather_db = get_db()
     last = weather_db.get_last_record()
     last_row = last[0] if last else None
     dht_status = get_dht_status()
@@ -171,7 +207,7 @@ def api_sensor_status():
 def get_weather_csv_range(start_date, end_date):
     if not validate_date_str(start_date) or not validate_date_str(end_date):
         return "Invalid date format. Use YYYY-MM-DD", 400
-    weather_db = db_api.WeatherDB(web_settings.DB_SETTINGS)
+    weather_db = get_db()
     rows = weather_db.get_records_by_date_range(start_date, end_date)
     output = io.StringIO()
     writer = csv.writer(output)
@@ -188,7 +224,7 @@ def get_weather_csv_range(start_date, end_date):
 def get_weather_csv(date_str):
     if not validate_date_str(date_str):
         return "Invalid date format. Use YYYY-MM-DD", 400
-    weather_db = db_api.WeatherDB(web_settings.DB_SETTINGS)
+    weather_db = get_db()
     rows = weather_db.get_records_by_date(date_str)
     output = io.StringIO()
     writer = csv.writer(output)
@@ -224,15 +260,19 @@ def _compute_storm_trend(strikes: list) -> str:
 
 @app.route('/api/lightning/recent')
 def api_lightning_recent():
-    n = min(int(request.args.get('n', 20)), 200)
-    weather_db = db_api.WeatherDB(web_settings.DB_SETTINGS)
+    try:
+        n = int(request.args.get('n', 20))
+    except (TypeError, ValueError):
+        return jsonify(error="n must be an integer"), 400
+    n = max(1, min(n, 200))
+    weather_db = get_db()
     rows = weather_db.get_lightning_recent(n)
     return jsonify([dict(zip(LIGHTNING_COLS, r)) for r in rows])
 
 
 @app.route('/api/lightning/today')
 def api_lightning_today():
-    weather_db = db_api.WeatherDB(web_settings.DB_SETTINGS)
+    weather_db = get_db()
     rows = weather_db.get_lightning_today()
     strikes = [r for r in rows if r[2] == 'lightning']
     return jsonify({
@@ -245,7 +285,7 @@ def api_lightning_today():
 
 @app.route('/api/lightning/status')
 def api_lightning_status():
-    weather_db = db_api.WeatherDB(web_settings.DB_SETTINGS)
+    weather_db = get_db()
     last_24h = weather_db.get_lightning_last_hours(24)
     last_1h  = weather_db.get_lightning_last_hours(1)
 
@@ -267,4 +307,8 @@ def api_lightning_status():
 
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=8000, debug=True)
+    # Debug mode enables Werkzeug's interactive debugger, which allows remote
+    # code execution if reachable on the network — never bind it to 0.0.0.0.
+    debug_mode = os.environ.get('FLASK_DEBUG') == '1'
+    host = "127.0.0.1" if debug_mode else "0.0.0.0"
+    app.run(host=host, port=8000, debug=debug_mode)
