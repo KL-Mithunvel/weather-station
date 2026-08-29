@@ -51,9 +51,10 @@ class WeatherTimeScaleDB:
             logger.error(f'TimescaleDB connect failed: {self.last_error}')
             return False
 
-        if not self._create_schema():
-            self.close()
-            return False
+        # Best-effort: the role may only hold INSERT on tables someone else
+        # created, which is a perfectly good setup. A failure here is logged
+        # but must not stop us writing rows.
+        self._create_schema()
 
         self.last_error = None
         logger.info('TimescaleDB connected.')
@@ -63,10 +64,11 @@ class WeatherTimeScaleDB:
     def _try(cur, sql, description):
         """Run a statement that is allowed to fail, inside a savepoint.
 
-        Converting to a hypertable or adding the unique index can legitimately
-        fail on a database that already holds data (duplicate timestamps, a
-        plain table with rows). That must not abort the rest of the schema
-        setup, so each optional step gets its own savepoint to roll back to.
+        Every schema step can legitimately fail: the role may lack CREATE on
+        the schema, the table may already hold duplicate timestamps, the
+        timescaledb extension may be absent. In Postgres one failed statement
+        poisons the whole transaction, so each step gets a savepoint to roll
+        back to and the rest still run.
         """
         cur.execute('SAVEPOINT optional_step')
         try:
@@ -79,11 +81,10 @@ class WeatherTimeScaleDB:
             return False
 
     def _create_schema(self):
+        """Create anything missing. Every step is optional - see connect()."""
         try:
             with self.connection.cursor() as cur:
-                # The tables themselves are mandatory - without them there is
-                # nowhere to write.
-                cur.execute("""
+                self._try(cur, """
                     CREATE TABLE IF NOT EXISTS weather (
                         timestamp  TIMESTAMPTZ,
                         temp       REAL,
@@ -93,15 +94,15 @@ class WeatherTimeScaleDB:
                         wind_dir   INTEGER,
                         rain_qty   REAL
                     );
-                """)
-                cur.execute("""
+                """, 'weather table')
+                self._try(cur, """
                     CREATE TABLE IF NOT EXISTS lightning_strikes (
                         timestamp   TIMESTAMPTZ,
                         event_type  TEXT,
                         distance_km INTEGER,
                         energy      INTEGER
                     );
-                """)
+                """, 'lightning_strikes table')
                 self._try(cur, "SELECT create_hypertable('weather', 'timestamp', if_not_exists => TRUE);",
                           'weather hypertable')
                 self._try(cur, "SELECT create_hypertable('lightning_strikes', 'timestamp', if_not_exists => TRUE);",
