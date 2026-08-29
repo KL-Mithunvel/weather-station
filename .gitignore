@@ -1,2 +1,6 @@
 .venv
+.venv-daq
+.venv-web
 .idea
+__pycache__/
+*.pyc

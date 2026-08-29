@@ -1,5 +1,5 @@
 [Unit]
-Description=Gunicorn service for Weather Web App
+Description=Gunicorn service for the weather station current-readings page
 After=network.target
 
 [Service]
@@ -8,9 +8,12 @@ Group=klm
 
 WorkingDirectory=/home/klm/weather/weather_web
 Environment="PATH=/home/klm/weather/weather_web/.venv-web/bin"
-ExecStart=/home/klm/weather/weather_web/.venv-web/bin/gunicorn --workers 3 --bind 0.0.0.0:8000 app:app
-Restart=on-failure
-RestartSec=5
+# Must match STATUS_FILE in weather_daq/settings.py.
+Environment="WEATHER_STATUS_FILE=/tmp/weather_current.json"
+ExecStart=/home/klm/weather/weather_web/.venv-web/bin/gunicorn --workers 2 --bind 0.0.0.0:8000 app:app
+Restart=always
+RestartSec=10
+StartLimitIntervalSec=0
 
 [Install]
 WantedBy=multi-user.target

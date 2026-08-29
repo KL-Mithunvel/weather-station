@@ -1,314 +1,91 @@
-from flask import Flask, Response, g, jsonify, redirect, request, url_for, render_template
-from werkzeug.exceptions import HTTPException
-import csv
-import io
+"""Current-readings page for the weather station.
+
+Deliberately tiny. It reads the status file the acquire loop rewrites every
+cycle - no database, no history, no charts - so a page load is one small file
+read and still works when TimescaleDB is unreachable. Grafana handles history
+and dashboards.
+"""
+
 import json
-import sys
 import os
-import datetime
+from datetime import datetime, timezone
 
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
-from weather_daq import db_api
-import web_settings
-from web_log import logger
+from flask import Flask, jsonify, render_template
 
-COLS = ['id', 'timestamp', 'temp', 'rh', 'cpu_temp', 'wind_speed', 'wind_dir', 'rain_qty']
-LIGHTNING_COLS = ['id', 'timestamp', 'event_type', 'distance_km', 'energy']
-DHT_STATUS_FILE       = '/tmp/dht_status.json'
-LIGHTNING_STATUS_FILE = '/tmp/lightning_status.json'
+STATUS_FILE = os.environ.get('WEATHER_STATUS_FILE', '/tmp/weather_current.json')
 
-# Auto-seed the dev database when running locally (no Pi DB)
-_dev_db = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'weather_dev.db')
-if web_settings.DB_SETTINGS['DB_FILE_NAME'] == _dev_db and not os.path.exists(_dev_db):
-    try:
-        import seed_dev_db
-        seed_dev_db.seed()
-    except Exception as e:
-        print(f"[seed] Could not auto-seed dev DB: {e}")
-
-
-def validate_date_str(date_str):
-    try:
-        datetime.datetime.strptime(date_str, "%Y-%m-%d")
-        return True
-    except ValueError:
-        return False
-
-
-def get_dht_status():
-    try:
-        with open(DHT_STATUS_FILE) as f:
-            return json.load(f)
-    except Exception:
-        return None
-
-
-def get_lightning_i2c_status():
-    try:
-        with open(LIGHTNING_STATUS_FILE) as f:
-            return json.load(f)
-    except Exception:
-        return None
-
-
-def assess_sensor_health(last_row, dht_status, lightning_i2c_status=None):
-    health = {
-        'dht22':     {'status': 'unknown', 'message': 'No status data'},
-        'arduino':   {'status': 'unknown', 'message': 'No data'},
-        'cpu':       {'status': 'unknown', 'message': 'No data'},
-        'lightning': {'status': 'unknown', 'message': 'No status data'},
-    }
-    if not last_row:
-        return health
-
-    _, ts, temp, rh, cpu_temp, wind_speed, wind_dir, rain_qty = last_row
-
-    # DHT22
-    if dht_status and dht_status.get('is_faulty'):
-        health['dht22'] = {'status': 'fault', 'message': dht_status.get('last_error', 'Fault reported')}
-    elif temp is not None and rh is not None:
-        if temp < -40 or temp > 80:
-            health['dht22'] = {'status': 'error', 'message': f'Temp out of range: {temp}°C'}
-        elif rh < 0 or rh > 100:
-            health['dht22'] = {'status': 'error', 'message': f'Humidity out of range: {rh}%'}
-        else:
-            health['dht22'] = {'status': 'ok', 'message': f'{temp}°C / {rh}% RH'}
-    else:
-        health['dht22'] = {'status': 'fault', 'message': 'Null readings from sensor'}
-
-    # Arduino (wind + rain)
-    if wind_speed is not None and wind_dir is not None:
-        if wind_speed < 0:
-            health['arduino'] = {'status': 'error', 'message': f'Negative wind speed: {wind_speed}'}
-        elif not (0 <= wind_dir <= 360):
-            health['arduino'] = {'status': 'error', 'message': f'Wind direction out of range: {wind_dir}°'}
-        else:
-            health['arduino'] = {'status': 'ok', 'message': f'{wind_speed} kph / {wind_dir}°'}
-    else:
-        health['arduino'] = {'status': 'fault', 'message': 'No wind data from Arduino'}
-
-    # CPU
-    if cpu_temp is not None:
-        if cpu_temp > 85:
-            health['cpu'] = {'status': 'error', 'message': f'Over-temperature: {cpu_temp}°C'}
-        elif cpu_temp < 0:
-            health['cpu'] = {'status': 'error', 'message': f'Out of range: {cpu_temp}°C'}
-        else:
-            health['cpu'] = {'status': 'ok', 'message': f'{cpu_temp}°C'}
-    else:
-        health['cpu'] = {'status': 'fault', 'message': 'No CPU temperature data'}
-
-    # Lightning / AS3935 I2C
-    if lightning_i2c_status is None:
-        health['lightning'] = {'status': 'unknown', 'message': 'DAQ status file not found'}
-    elif not lightning_i2c_status.get('is_connected'):
-        err = lightning_i2c_status.get('last_error') or 'I2C not responding'
-        health['lightning'] = {'status': 'fault', 'message': err}
-    else:
-        health['lightning'] = {'status': 'ok', 'message': 'I2C connected'}
-
-    return health
-
+# A reading older than this means the acquire loop has stopped or is stuck.
+STALE_AFTER_SECONDS = 180
 
 app = Flask(__name__)
 
 
-def get_db():
-    if 'weather_db' not in g:
-        g.weather_db = db_api.WeatherDB(web_settings.DB_SETTINGS)
-    return g.weather_db
+def read_status():
+    """Return the DAQ status file plus a staleness verdict, or an error dict."""
+    try:
+        with open(STATUS_FILE) as f:
+            status = json.load(f)
+    except FileNotFoundError:
+        return {'available': False, 'error': f'No reading yet ({STATUS_FILE} not found)'}
+    except (OSError, ValueError) as e:
+        return {'available': False, 'error': f'Cannot read status file: {e}'}
+
+    # A status file written by an older DAQ has no `writing` flag; fall back to
+    # the socket state so the page is right during an upgrade.
+    tdb = status.get('timescaledb')
+    if isinstance(tdb, dict):
+        tdb.setdefault('writing', tdb.get('connected', False))
+
+    status['available'] = True
+    status['age_seconds'] = None
+    status['stale'] = True
+    updated = status.get('updated')
+    if updated:
+        try:
+            age = (datetime.now() - datetime.fromisoformat(updated)).total_seconds()
+            status['age_seconds'] = int(age)
+            status['stale'] = age > STALE_AFTER_SECONDS
+        except ValueError:
+            pass
+    return status
 
 
-@app.teardown_appcontext
-def close_db(exception=None):
-    weather_db = g.pop('weather_db', None)
-    if weather_db is not None:
-        weather_db.close()
-
-
-@app.errorhandler(404)
-def handle_not_found(e):
-    if request.path.startswith('/api/'):
-        return jsonify(error="Not found"), 404
-    return render_template('error.html', code=404, message="Page not found"), 404
-
-
-@app.errorhandler(Exception)
-def handle_exception(e):
-    if isinstance(e, HTTPException):
-        code = e.code
-        message = e.description
-    else:
-        code = 500
-        message = "Internal server error"
-    logger.error(f"Unhandled exception on {request.method} {request.path}: {e}", exc_info=True)
-    if request.path.startswith('/api/'):
-        return jsonify(error=message), code
-    return render_template('error.html', code=code, message=message), code
+@app.template_filter('compass')
+def compass_point(degrees):
+    """Wind direction in degrees to a 16-point cardinal name."""
+    if degrees is None:
+        return ''
+    points = ('N', 'NNE', 'NE', 'ENE', 'E', 'ESE', 'SE', 'SSE',
+              'S', 'SSW', 'SW', 'WSW', 'W', 'WNW', 'NW', 'NNW')
+    return points[int((float(degrees) % 360) / 22.5 + 0.5) % 16]
 
 
 @app.route('/')
-def index():
-    return redirect(url_for('dashboard'))
+def current():
+    return render_template('current.html', status=read_status())
 
 
-@app.route('/dashboard')
-def dashboard():
-    return render_template('dashboard.html')
+@app.route('/api/current')
+def api_current():
+    status = read_status()
+    return jsonify(status), 200 if status['available'] else 503
 
 
-@app.route('/api/weather_web')
-def home():
-    return redirect(url_for('dashboard'))
-
-
-@app.route('/api/weather_data/last24h')
-def api_last24h():
-    weather_db = get_db()
-    rows = weather_db.get_last24h_records()
-    return jsonify([dict(zip(COLS, row)) for row in rows])
-
-
-@app.route('/api/weather_data', defaults={'date_str': None}, methods=['GET'])
-@app.route('/api/weather_data/<date_str>', methods=['GET'])
-def api_weather_data(date_str):
-    if date_str and not validate_date_str(date_str):
-        return "Invalid date format. Use YYYY-MM-DD", 400
-    date_str = date_str or datetime.date.today().strftime("%Y-%m-%d")
-    weather_db = get_db()
-    rows = weather_db.get_records_by_date(date_str)
-    return jsonify([dict(zip(COLS, row)) for row in rows])
-
-
-@app.route('/api/weather_summary/<date_str>', methods=['GET'])
-def api_weather_summary(date_str):
-    if not validate_date_str(date_str):
-        return "Invalid date format. Use YYYY-MM-DD", 400
-    weather_db = get_db()
-    return jsonify(weather_db.get_daily_summary(date_str))
-
-
-@app.route('/api/sensor_status')
-def api_sensor_status():
-    weather_db = get_db()
-    last = weather_db.get_last_record()
-    last_row = last[0] if last else None
-    dht_status = get_dht_status()
-    lightning_i2c = get_lightning_i2c_status()
-    health = assess_sensor_health(last_row, dht_status, lightning_i2c)
+@app.route('/healthz')
+def healthz():
+    """Liveness for the acquire loop, not for this app - handy for uptime checks."""
+    status = read_status()
+    healthy = status['available'] and not status['stale']
     return jsonify({
-        'sensors': health,
-        'last_reading': last_row[1] if last_row else None,
-        'checked_at': datetime.datetime.now().isoformat(timespec='seconds'),
-    })
+        'healthy': healthy,
+        'age_seconds': status.get('age_seconds'),
+        'checked_at': datetime.now(timezone.utc).isoformat(timespec='seconds'),
+    }), 200 if healthy else 503
 
 
-@app.route('/api/data_export/csv/range/<start_date>/<end_date>', methods=['GET'])
-def get_weather_csv_range(start_date, end_date):
-    if not validate_date_str(start_date) or not validate_date_str(end_date):
-        return "Invalid date format. Use YYYY-MM-DD", 400
-    weather_db = get_db()
-    rows = weather_db.get_records_by_date_range(start_date, end_date)
-    output = io.StringIO()
-    writer = csv.writer(output)
-    writer.writerow(COLS)
-    writer.writerows(rows)
-    return Response(
-        output.getvalue(),
-        mimetype="text/csv",
-        headers={"Content-disposition": f"attachment; filename=weather_{start_date}_to_{end_date}.csv"},
-    )
-
-
-@app.route('/api/data_export/csv/<date_str>', methods=['GET'])
-def get_weather_csv(date_str):
-    if not validate_date_str(date_str):
-        return "Invalid date format. Use YYYY-MM-DD", 400
-    weather_db = get_db()
-    rows = weather_db.get_records_by_date(date_str)
-    output = io.StringIO()
-    writer = csv.writer(output)
-    writer.writerow(COLS)
-    writer.writerows(rows)
-    return Response(
-        output.getvalue(),
-        mimetype="text/csv",
-        headers={"Content-disposition": f"attachment; filename=weather_{date_str}.csv"},
-    )
-
-
-def _compute_storm_trend(strikes: list) -> str:
-    """
-    Given a list of recent lightning-only rows (ordered oldest→newest),
-    return a human-readable trend string based on distance changes.
-    """
-    distances = [r[3] for r in strikes if r[2] == 'lightning' and r[3] is not None]
-    if not distances:
-        return 'clear'
-    if distances[-1] <= 5:
-        return 'overhead'
-    if len(distances) < 3:
-        return 'unknown'
-    recent   = sum(distances[-3:]) / 3
-    earlier  = sum(distances[:3])  / 3
-    if recent < earlier - 2:
-        return 'approaching'
-    if recent > earlier + 2:
-        return 'retreating'
-    return 'stationary'
-
-
-@app.route('/api/lightning/recent')
-def api_lightning_recent():
-    try:
-        n = int(request.args.get('n', 20))
-    except (TypeError, ValueError):
-        return jsonify(error="n must be an integer"), 400
-    n = max(1, min(n, 200))
-    weather_db = get_db()
-    rows = weather_db.get_lightning_recent(n)
-    return jsonify([dict(zip(LIGHTNING_COLS, r)) for r in rows])
-
-
-@app.route('/api/lightning/today')
-def api_lightning_today():
-    weather_db = get_db()
-    rows = weather_db.get_lightning_today()
-    strikes = [r for r in rows if r[2] == 'lightning']
-    return jsonify({
-        'strikes':       [dict(zip(LIGHTNING_COLS, r)) for r in strikes],
-        'strike_count':  len(strikes),
-        'noise_count':   sum(1 for r in rows if r[2] == 'noise'),
-        'disturber_count': sum(1 for r in rows if r[2] == 'disturber'),
-    })
-
-
-@app.route('/api/lightning/status')
-def api_lightning_status():
-    weather_db = get_db()
-    last_24h = weather_db.get_lightning_last_hours(24)
-    last_1h  = weather_db.get_lightning_last_hours(1)
-
-    strikes_24h = [r for r in last_24h if r[2] == 'lightning']
-    strikes_1h  = [r for r in last_1h  if r[2] == 'lightning']
-
-    last_strike = strikes_24h[-1] if strikes_24h else None
-    trend = _compute_storm_trend(last_24h)
-
-    return jsonify({
-        'last_strike_time':  last_strike[1] if last_strike else None,
-        'last_distance_km':  last_strike[3] if last_strike else None,
-        'last_energy':       last_strike[4] if last_strike else None,
-        'strike_count_1h':   len(strikes_1h),
-        'strike_count_24h':  len(strikes_24h),
-        'storm_trend':       trend,
-        'checked_at':        datetime.datetime.now().isoformat(timespec='seconds'),
-    })
-
-
-if __name__ == "__main__":
+if __name__ == '__main__':
     # Debug mode enables Werkzeug's interactive debugger, which allows remote
-    # code execution if reachable on the network — never bind it to 0.0.0.0.
+    # code execution if reachable on the network - never bind it to 0.0.0.0.
     debug_mode = os.environ.get('FLASK_DEBUG') == '1'
-    host = "127.0.0.1" if debug_mode else "0.0.0.0"
+    host = '127.0.0.1' if debug_mode else '0.0.0.0'
     app.run(host=host, port=8000, debug=debug_mode)

@@ -1,14 +1,21 @@
 [Unit]
-Description=Weather DAQinstance
-After=network.target
+Description=Weather station data acquisition
+After=network-online.target
+Wants=network-online.target
 
 [Service]
 User=klm
 Group=klm
 WorkingDirectory=/home/klm/weather/weather_daq/
 ExecStart=/home/klm/weather/weather_daq/.venv-daq/bin/python acquire.py
-Restart=on-failure
-RestartSec=5
+# Unbuffered so log lines reach journalctl as they happen, not at exit.
+Environment=PYTHONUNBUFFERED=1
+# The loop swallows its own errors; a restart here means the process itself
+# died, so always bring it back.
+Restart=always
+RestartSec=10
+# Never give up restarting - the station is unattended.
+StartLimitIntervalSec=0
 
 [Install]
 WantedBy=multi-user.target
