@@ -17,6 +17,18 @@ from daq_log import logger
 # Do not hammer a missing port every cycle.
 RECONNECT_INTERVAL = 30
 
+# Cap on how much of a bad frame goes into a log line or the status file. A
+# dead serial line delivers hundreds of NUL bytes per read; logging that in
+# full is ~1.4 MB/day of noise.
+MAX_ERROR_CHARS = 60
+
+
+def _short(text):
+    text = str(text)
+    if len(text) <= MAX_ERROR_CHARS:
+        return text
+    return f'{text[:MAX_ERROR_CHARS]}... ({len(text)} chars)'
+
 
 class ArduinoSerial:
 
@@ -63,6 +75,17 @@ class ArduinoSerial:
                 pass
             self.serial = None
 
+    @staticmethod
+    def _decode(raw):
+        """Decode one frame, discarding NUL padding.
+
+        A port that is open but receiving nothing (board unpowered, sketch not
+        running, charge-only USB cable) delivers long runs of NUL bytes.
+        Dropping them lets a partially corrupted frame still parse, and turns a
+        pure-noise read into an empty string instead of a 1 kB error message.
+        """
+        return raw.decode('utf-8', errors='replace').replace('\x00', '').strip()
+
     def read_values(self):
         if not self._ensure_open():
             return None
@@ -71,23 +94,23 @@ class ArduinoSerial:
 
             # Drain all buffered lines, keep only the most recent.
             while self.serial.in_waiting > 0:
-                line = self.serial.readline().decode('utf-8', errors='replace').strip()
+                line = self._decode(self.serial.readline())
                 if line:
                     last_line = line
 
             # If nothing was buffered, block for one fresh line.
             if last_line is None:
-                line = self.serial.readline().decode('utf-8', errors='replace').strip()
+                line = self._decode(self.serial.readline())
                 if line:
                     last_line = line
 
             if not last_line:
-                self.last_error = 'No data from Arduino'
+                self.last_error = 'No data from Arduino (silent serial line)'
                 return None
 
             values = [round(float(x), 2) for x in last_line.split(',')]
             if len(values) != 3:
-                self.last_error = f'Malformed line: {last_line!r}'
+                self.last_error = f'Malformed line: {_short(repr(last_line))}'
                 logger.error(f'Arduino: {self.last_error}')
                 return None
 
@@ -105,7 +128,7 @@ class ArduinoSerial:
             self.close()
             return None
         except ValueError as e:
-            self.last_error = f'Unparseable reading: {e}'
+            self.last_error = f'Unparseable reading: {_short(e)}'
             logger.error(f'Arduino: {self.last_error}')
             return None
 
