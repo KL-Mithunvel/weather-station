@@ -93,8 +93,17 @@ Raspberry Pi 4B (`rpi4b-weather`), code under `~/weather/`, production venvs nam
 `.venv-web` (see the `.service` files).
 
 ```bash
-cd spanner && ./upload.bat        # pscp weather_daq/ and weather_web/ to the Pi
+cd spanner
+./release.bat        # push -> Pi pulls -> restart. The real deploy.
+./upload.bat         # pscp the working tree -> restart. Dev shortcut, skips git.
 ```
+
+`release.bat` pushes the current branch, then runs `deploy.sh` on the Pi, which pulls,
+installs requirements/systemd units **only if those files changed**, restarts and verifies.
+It refuses to run with uncommitted changes. `upload.bat` bypasses git to test uncommitted
+work on real hardware; it leaves the Pi's tree dirty, so the next release needs `--force`.
+Neither script deletes files on the Pi. `~/weather` must be a git checkout - one-time setup
+is in `weather.MD`.
 
 Systemd units: `weather_daq/weather_daq.service`, `weather_web/install/weather_web.service`; nginx
 config at `weather_web/install/weather_web.nginx`. DAQ logs go to journald and rotate daily under

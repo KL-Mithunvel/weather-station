@@ -1,0 +1,3 @@
+# deploy.sh runs on the Pi - CRLF would break the shebang.
+*.sh text eol=lf
+*.bat text eol=crlf
