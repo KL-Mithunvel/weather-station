@@ -46,11 +46,18 @@ systemctl is-active weather_daq weather_web
 Check it is alive:
 
 ```
-curl -s localhost:8000/healthz          # 200 = fresh reading, 503 = stale/stopped
-curl -s localhost:8000/api/current      # latest reading + sensor health + spool depth
+curl -s localhost:8000/api/weather_web              # current-reading table (HTML)
+curl -s localhost:8000/api/weather_summary/<date>    # today's min/max/avg (JSON)
 journalctl -u weather_daq -f
 tail -f /var/log/weather/weather_daq.log
 ```
+
+(2026-09-14: `weather_web` was reverted from the status-file-only page back to the
+original current-reading + daily min/max/avg table, now querying TimescaleDB directly
+via the new `weather_web/db_api.py` - see `.claude/CLAUDE.md`. The old `/healthz` and
+`/api/current` status-file endpoints no longer exist; sensor-fault info is folded into
+the `/api/weather_web` table's alert banner instead, still read from the DAQ's status
+file.)
 
 ## When TimescaleDB is down
 
@@ -61,3 +68,32 @@ failing. Nothing needs restarting after the database is fixed.
 
 Spool cap is 200,000 readings (~139 days). Past that the oldest are dropped, with an ERROR line
 in the log.
+
+## TODO: Grafana setup - blocked on SSH access to the DB host
+
+TimescaleDB lives on a separate host, `timescaledb.apps.smtw.in` (not the Pi - confirmed via
+`weather_daq/settings.py` `DB_HOST`), so no data migration is needed for Grafana; it just needs to
+be installed on/near that host and pointed at the existing database.
+
+**Blocked as of 2026-09-14**: could not get a diagnostic shell on `timescaledb.apps.smtw.in` to
+check what's already running there / plan the Grafana install.
+- The Pi's saved `plink` password (klm@rpi4b-weather) does **not** work here - this host only
+  accepts SSH public-key auth (`server sent: publickey`).
+- Tried Pageant (SSH agent) with no `-pw` - still rejected, so either Pageant has no key loaded, or
+  the loaded key isn't authorized on this host's `authorized_keys`.
+- Host key fingerprint seen on first connect (accepted/pinned this session, not yet trusted
+  long-term): `ssh-ed25519 SHA256:vsUnvj4e8Yz24omARpyC6BfWi6TcGGpFR79WxGVNd3s`
+
+**To unblock**, one of:
+1. Point me at a private key file (OpenSSH or `.ppk`) that's authorized on that host, and add a
+   `plink -i <path>` permission similar to the existing `rpi4b-weather` one in
+   `.claude/settings.local.json`, or
+2. Load the right key into Pageant before the next session, or
+3. Add my usual working setup's public key to that host's `~/.ssh/authorized_keys` yourself, or
+4. Just run the Grafana install/checks yourself and paste output back for review.
+
+Once access works, the plan is: check what's on the host (OS, existing services, disk/ports),
+install Grafana, add a Postgres data source pointing at TimescaleDB (`localhost:5432/iiot` if
+Grafana runs on the same box), then build panels for temp/rh/wind/rain/lightning. Remember: DB
+stores wind direction as the direction the wind blows *toward* (non-standard) - label panels
+accordingly, don't invert.
