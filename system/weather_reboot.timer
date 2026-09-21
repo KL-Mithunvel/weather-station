@@ -1,0 +1,13 @@
+[Unit]
+Description=Daily reboot of the weather station Pi
+
+[Timer]
+# Pinned to IST so the reboot does not move if the Pi's timezone is ever wrong.
+# Off the midnight rollover, when the DAQ resets the Arduino's rain total.
+OnCalendar=*-*-* 03:30:00 Asia/Kolkata
+# Deliberately not persistent: if the Pi was off at 03:30, rebooting it again
+# the moment it comes back would only add a second outage.
+Persistent=false
+
+[Install]
+WantedBy=timers.target

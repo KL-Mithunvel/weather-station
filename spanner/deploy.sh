@@ -75,10 +75,28 @@ install_unit() {
 }
 install_unit weather_daq/weather_daq.service
 install_unit weather_web/install/weather_web.service
+install_unit system/weather_reboot.service
+install_unit system/weather_reboot.timer
 
 if [ "$units_changed" = 1 ]; then
     echo "Reloading systemd..."
     sudo systemctl daemon-reload
+fi
+
+# Root-owned copy of the reboot script, so root never executes a file the klm
+# user can edit.
+REBOOT_BIN="${REBOOT_BIN:-/usr/local/sbin/weather-daily-reboot}"
+if ! cmp -s system/weather-daily-reboot.sh "$REBOOT_BIN"; then
+    echo "Installing $REBOOT_BIN..."
+    sudo install -D -m 755 -o root -g root system/weather-daily-reboot.sh "$REBOOT_BIN"
+fi
+
+# Hardware watchdog. PID 1 reads this at boot, so a change is picked up by the
+# next reboot rather than applied to the running system.
+WATCHDOG_CONF="${WATCHDOG_CONF:-/etc/systemd/system.conf.d/weather-watchdog.conf}"
+if ! cmp -s system/weather-watchdog.conf "$WATCHDOG_CONF"; then
+    echo "Installing $WATCHDOG_CONF (takes effect at next boot)..."
+    sudo install -D -m 644 -o root -g root system/weather-watchdog.conf "$WATCHDOG_CONF"
 fi
 
 echo "Restarting services..."
@@ -88,6 +106,26 @@ sleep 3
 # Non-zero here fails the release: a unit that restarts then dies is not a
 # successful deploy.
 systemctl is-active weather_daq weather_web
+
+# Daily reboot. A reboot only restores what is enabled at boot, so make sure
+# our units are, and refuse to arm the timer if anything else the station needs
+# (nginx) is not - the first unattended reboot would otherwise take it down.
+echo
+echo "Arming the daily reboot..."
+sudo systemctl enable weather_daq weather_web
+if ! "$REBOOT_BIN" --check-boot; then
+    sudo systemctl disable --now weather_reboot.timer 2>/dev/null || true
+    echo
+    echo "The code is deployed and running, but the daily reboot is NOT armed."
+    echo "Fix the above (e.g. 'sudo systemctl enable nginx'), then re-run the release."
+    exit 1
+fi
+sudo systemctl enable weather_reboot.timer
+# Restart rather than start, so an edited OnCalendar takes effect.
+sudo systemctl restart weather_reboot.timer
+# A calendar spec systemd cannot parse leaves the timer inactive; fail loudly.
+systemctl is-active weather_reboot.timer
+systemctl list-timers weather_reboot.timer --no-pager
 
 echo
 echo "Deployed $(git log -1 --oneline)"

@@ -1,3 +1,7 @@
 # deploy.sh runs on the Pi - CRLF would break the shebang.
 *.sh text eol=lf
+# Copied verbatim into /etc/systemd/system on the Pi.
+*.service text eol=lf
+*.timer text eol=lf
+*.conf text eol=lf
 *.bat text eol=crlf

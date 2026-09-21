@@ -59,6 +59,37 @@ via the new `weather_web/db_api.py` - see `.claude/CLAUDE.md`. The old `/healthz
 the `/api/weather_web` table's alert banner instead, still read from the DAQ's status
 file.)
 
+## Daily reboot
+
+The Pi reboots itself at 03:30 IST (`system/weather_reboot.timer`). `release.bat` installs and
+arms it, but only if `weather_daq`, `weather_web` (and nginx, if installed) are enabled at boot -
+otherwise the release ends with an error saying the reboot is **not** armed.
+
+```
+systemctl list-timers weather_reboot.timer          # next run
+sudo /usr/local/sbin/weather-daily-reboot --check   # would it reboot right now? (never reboots)
+sudo systemctl start weather_reboot.service         # reboot now, if the checks pass
+sudo systemctl disable --now weather_reboot.timer   # turn the daily reboot off
+```
+
+After the first night, confirm it worked:
+
+```
+last -x reboot shutdown | head            # boot/shutdown history (survives reboots)
+cat /var/log/weather/reboot.log           # reboots taken, and reasons for any that were skipped
+systemctl is-active weather_daq weather_web nginx
+journalctl -u weather_daq -b | head -30   # the DAQ's start-up after this boot
+```
+
+Things worth knowing:
+- Readings for the ~1-2 minutes the Pi is down are simply not taken. Rain falling in that window
+  is lost; the reboot also zeroes the Arduino's rain counter (opening the serial port resets it),
+  which is harmless because rainfall is stored as per-reading deltas.
+- The hardware watchdog (`system/weather-watchdog.conf`) only takes effect at a boot. Check it with
+  `systemctl show -p RuntimeWatchdogUSec` (expect `10s`) and `dmesg | grep -i watchdog`.
+- Status file (`/tmp/weather_current.json`) is wiped by a reboot; the web page shows no sensor
+  banner until the DAQ's first cycle rewrites it.
+
 ## When TimescaleDB is down
 
 Readings keep accumulating in the local spool (`SPOOL_FILE`, default

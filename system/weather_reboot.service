@@ -1,0 +1,7 @@
+[Unit]
+Description=Scheduled reboot of the weather station Pi
+
+[Service]
+Type=oneshot
+# Does its own safety checks and may decline to reboot; see the script.
+ExecStart=/usr/local/sbin/weather-daily-reboot

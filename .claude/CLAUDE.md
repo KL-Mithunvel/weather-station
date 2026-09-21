@@ -50,7 +50,18 @@ sensors -> weather_daq -> spool (sqlite) -> TimescaleDB -> Grafana (history/grap
   not yet done).
 - **`arduino UNO/DAQ.ino`** - prints `windDir,windSpeed,totalRainfall` CSV at 115200 baud once a
   second. Holds the per-vane ADC calibration table.
-- **`spanner/`** - deployment scripts (Windows `.bat`).
+- **`system/`** - Pi-level resilience, installed by `spanner/deploy.sh` (not part of either app):
+  - `weather_reboot.timer` + `.service` + `weather-daily-reboot.sh` - reboots the Pi daily at 03:30
+    IST (`Persistent=false`). The script (installed root-owned to `/usr/local/sbin/`) declines to
+    reboot if up < 1h (no reboot loops), if dpkg/apt is running, or if `weather_daq`/`weather_web`/
+    nginx are not enabled at boot. Declines are logged to `/var/log/weather/reboot.log`, exit 0.
+    It is a **reboot**, not halt-and-power-on: a Pi 4 has no RTC and cannot wake itself.
+  - `weather-watchdog.conf` - systemd hardware watchdog (`RuntimeWatchdogSec`, `RebootWatchdogSec`)
+    so a hung kernel or a hung shutdown resets the board.
+  - A reboot fixes a wedged Pi/USB/serial/network stack. It does **not** fix a DB outage, a bad
+    credential or a dead sensor - those are handled by the spool and sensor recovery, by design.
+    Do not add "reboot if the DB is down" logic.
+- **`spanner/`** - deployment scripts (Windows `.bat`, plus `deploy.sh` which runs on the Pi).
 
 ## Reliability rules
 
@@ -62,7 +73,11 @@ These are the point of the current design; keep them intact when editing:
 - Nothing at boot may be fatal except a genuinely unusable sensor object - a failed first DB connect
   is expected and fine.
 - The loop is scheduled off `time.monotonic()` so it does not drift by the sensor read time.
-- SIGTERM finishes the current cycle and cleans up, so `systemctl stop` is clean.
+- SIGTERM finishes the current cycle and cleans up, so `systemctl stop` is clean. The between-cycles
+  wait is a `threading.Event`, not `time.sleep`, so a stop is prompt - keep it that way, the daily
+  reboot relies on it.
+- Anything the station needs after a reboot must be **enabled at boot**. The daily reboot only
+  restores enabled units; `deploy.sh` and the reboot script both refuse to reboot otherwise.
 
 ## Database schema
 

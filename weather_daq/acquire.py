@@ -14,6 +14,7 @@ database accepts them.
 import json
 import os
 import signal
+import threading
 import time
 from datetime import datetime
 
@@ -37,12 +38,17 @@ LIGHTNING_ENABLED = getattr(settings, 'LIGHTNING_ENABLED', False)
 WATCHDOG_EVERY = 30
 
 _running = True
+# Wakes the between-cycles wait so a stop does not sit out the rest of the
+# interval - systemd gives up and SIGKILLs after TimeoutStopSec, which matters
+# for the daily reboot.
+_stop = threading.Event()
 
 
 def _request_stop(signum, _frame):
     global _running
     logger.info(f'Signal {signum} received, finishing current cycle then stopping.')
     _running = False
+    _stop.set()
 
 
 def read_sensors(dht, arduino, cpu):
@@ -205,7 +211,7 @@ def acquire_loop(dht, arduino, cpu, spool, tdb, lightning):
         next_tick += ACQUIRE_INTERVAL
         delay = next_tick - time.monotonic()
         if delay > 0:
-            time.sleep(delay)
+            _stop.wait(delay)
         else:
             # Sensor reads overran the interval; resync instead of spinning.
             next_tick = time.monotonic()

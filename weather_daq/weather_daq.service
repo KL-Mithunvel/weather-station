@@ -7,6 +7,14 @@ Wants=network-online.target
 User=klm
 Group=klm
 WorkingDirectory=/home/klm/weather/weather_daq/
+# systemd (re)creates /var/log/weather owned by klm on every start, so file
+# logging survives a reboot even if /var/log was reset. daq_log.py falls back
+# to journald-only if the directory is missing, which loses the rotated logs.
+LogsDirectory=weather
+# The loop wakes immediately on SIGTERM; the longest it can be busy is one
+# cycle (sensor retries plus a DB connect timeout, ~25s). Past this, SIGKILL -
+# safe, the spool is sqlite WAL.
+TimeoutStopSec=60
 ExecStart=/home/klm/weather/weather_daq/.venv-daq/bin/python acquire.py
 # Unbuffered so log lines reach journalctl as they happen, not at exit.
 Environment=PYTHONUNBUFFERED=1
