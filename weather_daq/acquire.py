@@ -19,7 +19,6 @@ import time
 from datetime import datetime
 
 import arduino_serial
-import dht_sensor
 import pi_cpu_temp
 import settings
 from WeatherTimeScaleDB import WeatherTimeScaleDB
@@ -53,6 +52,24 @@ def _request_stop(signum, _frame):
     logger.info(f'Signal {signum} received, finishing current cycle then stopping.')
     _running = False
     _stop.set()
+
+
+def make_temp_sensor():
+    """The temperature/humidity sensor named by settings.TEMP_SENSOR.
+
+    'dht22' (default) or 'sht45' (any Sensirion SHT4x). Each driver is imported
+    only when selected, so the other one's libraries never load.
+    """
+    kind = str(getattr(settings, 'TEMP_SENSOR', 'dht22')).strip().lower()
+    if kind == 'sht45':
+        import sht4x_sensor
+        logger.info('Temperature/humidity sensor: SHT4x (I2C)')
+        return sht4x_sensor.SHT4xSensor(i2c_addr=getattr(settings, 'SHT4X_I2C_ADDR', 0x44))
+    if kind != 'dht22':
+        logger.error(f"Unknown TEMP_SENSOR {kind!r}; falling back to 'dht22'.")
+    import dht_sensor
+    logger.info('Temperature/humidity sensor: DHT22')
+    return dht_sensor.DHTSensor(dht_pin=settings.DHT_PIN)
 
 
 def reading_timestamp():
@@ -98,15 +115,16 @@ def read_sensors(dht, arduino, cpu):
 def assess_health(rec, dht, arduino):
     """Per-sensor verdict for the status file, from the reading just taken."""
     health = {}
+    sensor_key = getattr(dht, 'status_name', 'dht22')
 
     if dht.is_faulty or rec.temp is None or rec.rh is None:
-        health['dht22'] = {'status': 'fault', 'message': dht.last_error or 'No reading'}
+        health[sensor_key] = {'status': 'fault', 'message': dht.last_error or 'No reading'}
     elif not (-40 <= rec.temp <= 80):
-        health['dht22'] = {'status': 'error', 'message': f'Temperature out of range: {rec.temp} C'}
+        health[sensor_key] = {'status': 'error', 'message': f'Temperature out of range: {rec.temp} C'}
     elif not (0 <= rec.rh <= 100):
-        health['dht22'] = {'status': 'error', 'message': f'Humidity out of range: {rec.rh} %'}
+        health[sensor_key] = {'status': 'error', 'message': f'Humidity out of range: {rec.rh} %'}
     else:
-        health['dht22'] = {'status': 'ok', 'message': f'{rec.temp} C / {rec.rh} %RH'}
+        health[sensor_key] = {'status': 'ok', 'message': f'{rec.temp} C / {rec.rh} %RH'}
 
     if rec.wind_speed is None or rec.wind_dir is None:
         health['arduino'] = {'status': 'fault', 'message': arduino.last_error or 'No data from Arduino'}
@@ -244,7 +262,7 @@ def main():
     logger.info('Booting acquire loop...')
     if not DB_WRITES_ENABLED:
         logger.warning('DB_WRITES_ENABLED is False: readings are spooled but NOT uploaded to TimescaleDB.')
-    dht = dht_sensor.DHTSensor(dht_pin=settings.DHT_PIN)
+    dht = make_temp_sensor()
     arduino = arduino_serial.ArduinoSerial(settings.SERIAL_PORT, settings.BAUD_RATE)
     cpu = pi_cpu_temp.PiBoard()
     spool = Spool(SPOOL_FILE)
