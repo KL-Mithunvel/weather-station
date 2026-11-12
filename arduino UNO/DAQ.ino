@@ -17,7 +17,7 @@ void setup()
     calibrationParams.vaneADCValues[WMK_ANGLE_0_0] = 785;
     calibrationParams.vaneADCValues[WMK_ANGLE_22_5] = 405;
     calibrationParams.vaneADCValues[WMK_ANGLE_45_0] = 460;
-calibrationParams.vaneADCValues[WMK_ANGLE_67_5] = 26;                               `   ``  `                   
+calibrationParams.vaneADCValues[WMK_ANGLE_67_5] = 26;
     calibrationParams.vaneADCValues[WMK_ANGLE_90_0] = 93;
     calibrationParams.vaneADCValues[WMK_ANGLE_112_5] = 65;
     calibrationParams.vaneADCValues[WMK_ANGLE_135_0] = 184;
