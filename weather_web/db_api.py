@@ -11,6 +11,8 @@ boundary is the database role - give web_settings.DB_SETTINGS a role that only
 has SELECT on `weather` (see weather.MD).
 """
 
+import re
+
 import psycopg2
 
 COLS = ['timestamp', 'temp', 'rh', 'cpu_temp', 'wind_speed', 'wind_dir', 'rain_qty']
@@ -23,6 +25,22 @@ SESSION_OPTIONS = '-c default_transaction_read_only=on -c statement_timeout=8000
 DAY_FILTER = "timestamp >= %(d)s::date AND timestamp < (%(d)s::date + 1)"
 
 
+def _session_options(db_settings):
+    """SESSION_OPTIONS plus the optional DB_TIMEZONE (e.g. 'Asia/Kolkata').
+
+    Timestamps are stored as true instants (timestamptz); the session time zone
+    only decides where midnight falls and how they are displayed. The value is
+    validated because it is interpolated into a connection option.
+    """
+    options = SESSION_OPTIONS
+    tz = db_settings.get("DB_TIMEZONE")
+    if tz:
+        if not re.fullmatch(r"[A-Za-z0-9_+\-/]{1,64}", tz):
+            raise ValueError(f"invalid DB_TIMEZONE: {tz!r}")
+        options += f" -c TimeZone={tz}"
+    return options
+
+
 class WeatherDB:
 
     def __init__(self, db_settings):
@@ -33,7 +51,7 @@ class WeatherDB:
             "user": db_settings.get("DB_USER", "weather"),
             "password": db_settings.get("DB_PASSWORD", ""),
             "connect_timeout": 5,
-            "options": SESSION_OPTIONS,
+            "options": _session_options(db_settings),
             "application_name": "weather_web",
         }
         self.connection = None

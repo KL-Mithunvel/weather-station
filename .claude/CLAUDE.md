@@ -86,6 +86,10 @@ These are the point of the current design; keep them intact when editing:
 
 ## Database schema
 
+**Timestamps are true instants** (`timestamptz`): records are made tz-aware (`records.aware()`, 
+`datetime.now().astimezone()`). Never send naive datetimes to the DB - the server session is UTC. 
+`settings.DB_WRITES_ENABLED = False` pauses uploads (spool keeps filling); see `weather.MD` "Timestamps".
+
 TimescaleDB `weather` hypertable: `timestamp, temp, rh, cpu_temp, wind_speed, wind_dir, rain_qty`.
 `lightning_strikes` hypertable: `timestamp, event_type, distance_km, energy`. Schema is created
 idempotently on connect. If you add a column, update the `CREATE TABLE`, the INSERT in

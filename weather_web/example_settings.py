@@ -12,4 +12,7 @@ DB_SETTINGS = {
     'DB_USER': "",
     'DB_PASSWORD': "",
     'DB_NAME': "",
+    # Session time zone: decides where "today" starts and how times are shown.
+    # Stored timestamps are true instants, so set this to the station's zone.
+    'DB_TIMEZONE': "Asia/Kolkata",
 }

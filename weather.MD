@@ -175,3 +175,17 @@ ALTER ROLE weather_ro SET default_transaction_read_only = on;
 
 While there, the DAQ role is insert-only so `weather_timestamp_key` was never created (re-sent batches
 are not deduplicated). As the table owner: `CREATE UNIQUE INDEX IF NOT EXISTS weather_timestamp_key ON weather (timestamp);`
+
+## Timestamps (fixed 2026-11-13)
+
+`weather.timestamp` is `timestamptz` and now always holds the **true instant**. Before the fix the DAQ sent
+naive IST wall-clock times and the UTC database session labelled them UTC, so every stored time (403,882 rows,
+2025-06-12 onward) was exactly +05:30 too late.
+
+- DAQ: `records.aware()` attaches the Pi's local offset; the acquire loop uses `datetime.now().astimezone()`.
+- Web: set `'DB_TIMEZONE': "Asia/Kolkata"` in `web_settings.py` DB_SETTINGS so "today" starts at IST midnight.
+  Grafana: leave the dashboard on "Browser" time.
+- **History correction** is `system/db/fix_timestamp_offset.sql`, run once by the DB owner while the DAQ is
+  paused (`DB_WRITES_ENABLED = False` in the Pi's `weather_daq/settings.py`; readings keep spooling locally).
+  To resume: set `DB_WRITES_ENABLED = True` (or delete the line) and `sudo systemctl restart weather_daq`;
+  the spool backfills with correct timestamps.

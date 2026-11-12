@@ -22,6 +22,10 @@ DB_SETTINGS = {
     'DB_NAME': "",
 }
 
+# Set False to pause uploads (readings still accumulate in the spool and backfill
+# when set back to True + service restart). Normally leave True.
+DB_WRITES_ENABLED = True
+
 # Local write-ahead buffer. Readings land here first and are deleted only once
 # TimescaleDB accepts them, so a database outage costs disk instead of data.
 SPOOL_FILE = '/home/klm/weather/data/spool.db'

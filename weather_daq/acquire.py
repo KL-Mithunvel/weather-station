@@ -32,6 +32,10 @@ SPOOL_FILE = getattr(settings, 'SPOOL_FILE', '/home/klm/weather/data/spool.db')
 ACQUIRE_INTERVAL = getattr(settings, 'ACQUIRE_INTERVAL', 60)
 FLUSH_BATCH = getattr(settings, 'FLUSH_BATCH', 500)
 LIGHTNING_ENABLED = getattr(settings, 'LIGHTNING_ENABLED', False)
+# Temporarily stop uploading to TimescaleDB. Readings keep landing in the spool
+# (with correct timestamps) and backfill when this is set back to True and the
+# service is restarted. Used while history is being corrected on the server.
+DB_WRITES_ENABLED = getattr(settings, 'DB_WRITES_ENABLED', True)
 
 # One "still alive" line per this many cycles, so the log shows progress
 # without writing a line a minute.
@@ -53,7 +57,7 @@ def _request_stop(signum, _frame):
 
 def read_sensors(dht, arduino, cpu):
     """Build one reading. Each sensor failure degrades to None, never raises."""
-    rec = WeatherRecord(timestamp=datetime.now().replace(microsecond=0))
+    rec = WeatherRecord(timestamp=datetime.now().astimezone().replace(microsecond=0))
 
     try:
         rec.temp, rec.rh = dht.read_values()
@@ -123,7 +127,8 @@ def write_status(rec, health, pending, tdb):
     # connection can be open while every INSERT is rejected.
     status['timescaledb'] = {
         'connected': tdb.is_connected,
-        'writing': tdb.is_connected and tdb.last_error is None,
+        'writing': DB_WRITES_ENABLED and tdb.is_connected and tdb.last_error is None,
+        'paused': not DB_WRITES_ENABLED,
         'last_error': tdb.last_error,
     }
     status['updated'] = datetime.now().replace(microsecond=0).isoformat()
@@ -140,6 +145,8 @@ def write_status(rec, health, pending, tdb):
 
 def flush_spool(spool, tdb):
     """Push spooled readings to TimescaleDB, dropping only what it accepted."""
+    if not DB_WRITES_ENABLED:
+        return
     batch = spool.pending(FLUSH_BATCH)
     if not batch:
         return
@@ -186,7 +193,7 @@ def acquire_loop(dht, arduino, cpu, spool, tdb, lightning):
             spool.add(rec)
             flush_spool(spool, tdb)
 
-            if lightning is not None:
+            if lightning is not None and DB_WRITES_ENABLED:
                 drain_lightning(lightning, tdb)
 
             write_status(rec, assess_health(rec, dht, arduino), spool.count(), tdb)
@@ -222,6 +229,8 @@ def main():
     signal.signal(signal.SIGINT, _request_stop)
 
     logger.info('Booting acquire loop...')
+    if not DB_WRITES_ENABLED:
+        logger.warning('DB_WRITES_ENABLED is False: readings are spooled but NOT uploaded to TimescaleDB.')
     dht = dht_sensor.DHTSensor(dht_pin=settings.DHT_PIN)
     arduino = arduino_serial.ArduinoSerial(settings.SERIAL_PORT, settings.BAUD_RATE)
     cpu = pi_cpu_temp.PiBoard()
