@@ -44,6 +44,7 @@ MAX_HISTORY_DAYS = 31
 # contain device paths or driver text) is deliberately not shown.
 SENSOR_LABELS = {
     'dht22': 'Temperature / humidity sensor',
+    'temp_rh': 'Temperature / humidity sensor',
     'arduino': 'Wind / rain sensors',
     'cpu': 'Station computer',
 }
