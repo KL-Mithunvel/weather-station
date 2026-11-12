@@ -219,8 +219,13 @@ def _load_home(today):
     return with_db(query)
 
 
+def _fmt(value, unit=''):
+    """'-' for a missing value (sensor down / no data), otherwise the value plus its unit."""
+    return '-' if value is None else f'{value}{unit}'
+
+
 def _row(label, current, vmin, vmax, vavg):
-    cells = ''.join(f"<td>{escape(str(c))}</td>" for c in (current, vmin, vmax, vavg))
+    cells = ''.join(f"<td>{escape(_fmt(c))}</td>" for c in (current, vmin, vmax, vavg))
     return f"<tr><td>{escape(label)}</td>{cells}</tr>"
 
 
@@ -245,12 +250,12 @@ def _build_home():
     nbsp = '&nbsp;'
     table_rows = [
         f"<tr><td>Last Reading</td><td>{escape(str(last_reading))}</td><td>Min</td><td>Max</td><td>Avg</td></tr>",
-        _row('Temperature', f"{cur_temp} oC", ds['temp']['min'], ds['temp']['max'], ds['temp']['avg']),
-        _row('Humidity', f"{cur_rh}% RH", ds['rh']['min'], ds['rh']['max'], ds['rh']['avg']),
+        _row('Temperature', _fmt(cur_temp, ' oC'), ds['temp']['min'], ds['temp']['max'], ds['temp']['avg']),
+        _row('Humidity', _fmt(cur_rh, '% RH'), ds['rh']['min'], ds['rh']['max'], ds['rh']['avg']),
         _row('Wind Speed', cur_wind_speed, nbsp, ds['wind_speed']['max'], ds['wind_speed']['avg']),
         _row('Wind Dir', cur_wind_dir, nbsp, nbsp, ds['wind_dir']['avg']),
         _row('Rain Qty', cur_rain_qty, nbsp, 'Total:', ds['rain']['total']),
-        _row('CPU Temp', f"{cur_cpu_temp} oC", ds['cpu_temp']['min'], ds['cpu_temp']['max'], ds['cpu_temp']['avg']),
+        _row('CPU Temp', _fmt(cur_cpu_temp, ' oC'), ds['cpu_temp']['min'], ds['cpu_temp']['max'], ds['cpu_temp']['avg']),
     ]
     # _row escapes its cells; the literal &nbsp; placeholders must survive.
     body = '\n            '.join(table_rows).replace('&amp;nbsp;', '&nbsp;')
