@@ -25,6 +25,11 @@ SESSION_OPTIONS = '-c default_transaction_read_only=on -c statement_timeout=8000
 DAY_FILTER = "timestamp >= %(d)s::date AND timestamp < (%(d)s::date + 1)"
 
 
+# Rows written by the corrected DAQ (since 2026-11-13) have a non-zero
+# microsecond part; legacy rows were whole seconds. See weather_daq/acquire.py.
+NEW_ERA = "(extract(microseconds from timestamp)::bigint % 1000000) <> 0"
+
+
 def _session_options(db_settings):
     """SESSION_OPTIONS plus the optional DB_TIMEZONE (e.g. 'Asia/Kolkata').
 
@@ -65,10 +70,20 @@ class WeatherDB:
             self.connect()
 
     def get_last_record(self):
+        """Newest reading. Prefers rows of the corrected era (see NEW_ERA): until
+        the legacy rows are shifted back 5h30m they sit in the same time range
+        and would otherwise win "newest" and show a 5h30m-old reading."""
         self.check_connection()
         with self.connection.cursor() as cur:
-            cur.execute(f"SELECT {', '.join(COLS)} FROM weather ORDER BY timestamp DESC LIMIT 1")
-            return cur.fetchall()
+            cur.execute(
+                f"SELECT {', '.join(COLS)} FROM weather "
+                f"WHERE timestamp > now() - INTERVAL '2 days' AND {NEW_ERA} "
+                "ORDER BY timestamp DESC LIMIT 1")
+            rows = cur.fetchall()
+            if not rows:  # station down for 2+ days, or no new-era data yet
+                cur.execute(f"SELECT {', '.join(COLS)} FROM weather ORDER BY timestamp DESC LIMIT 1")
+                rows = cur.fetchall()
+            return rows
 
     def get_records_by_date(self, dt):
         self.check_connection()

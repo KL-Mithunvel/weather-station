@@ -185,7 +185,12 @@ naive IST wall-clock times and the UTC database session labelled them UTC, so ev
 - DAQ: `records.aware()` attaches the Pi's local offset; the acquire loop uses `datetime.now().astimezone()`.
 - Web: set `'DB_TIMEZONE': "Asia/Kolkata"` in `web_settings.py` DB_SETTINGS so "today" starts at IST midnight.
   Grafana: leave the dashboard on "Browser" time.
-- **History correction** is `system/db/fix_timestamp_offset.sql`, run once by the DB owner while the DAQ is
-  paused (`DB_WRITES_ENABLED = False` in the Pi's `weather_daq/settings.py`; readings keep spooling locally).
-  To resume: set `DB_WRITES_ENABLED = True` (or delete the line) and `sudo systemctl restart weather_daq`;
-  the spool backfills with correct timestamps.
+- **Era marker (do not break):** legacy rows have whole-second timestamps and are 5h30m too late; rows written
+  since 2026-11-13 always have a NON-ZERO microsecond part (`acquire.reading_timestamp()`, never strip it).
+  `(extract(microseconds from timestamp)::bigint % 1000000) = 0` selects exactly the legacy rows. The web
+  page's "current reading" prefers new-era rows (`db_api.NEW_ERA`) so legacy rows in the same time range do not win.
+- **History correction** (still pending): `system/db/fix_timestamp_offset.sql`, run once by the DB owner. It shifts
+  only the legacy rows, so it is safe with the DAQ running and at any time. Until then: history before
+  2026-11-13 is 5h30m late, 2026-11-12 20:25 UTC to 2026-11-13 01:55 UTC holds both eras, and the web page
+  should keep `DB_TIMEZONE` unset (set `'Asia/Kolkata'` only after the correction).
+- `settings.DB_WRITES_ENABLED = False` still pauses uploads (spool keeps filling) if ever needed.

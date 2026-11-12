@@ -233,6 +233,7 @@ def _build_home():
 
     (last_reading, cur_temp, cur_rh, cur_cpu_temp,
      cur_wind_speed, cur_wind_dir, cur_rain_qty) = last[0]
+    last_reading = last_reading.replace(microsecond=0)
 
     alert_html = ''
     faults = get_sensor_faults()

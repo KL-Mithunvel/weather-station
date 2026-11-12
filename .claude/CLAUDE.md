@@ -88,6 +88,7 @@ These are the point of the current design; keep them intact when editing:
 
 **Timestamps are true instants** (`timestamptz`): records are made tz-aware (`records.aware()`, 
 `datetime.now().astimezone()`). Never send naive datetimes to the DB - the server session is UTC. 
+**Era marker: new rows keep a non-zero microsecond part** (legacy rows are whole seconds and 5h30m late) - never `.replace(microsecond=0)` a record timestamp. 
 `settings.DB_WRITES_ENABLED = False` pauses uploads (spool keeps filling); see `weather.MD` "Timestamps".
 
 TimescaleDB `weather` hypertable: `timestamp, temp, rh, cpu_temp, wind_speed, wind_dir, rain_qty`.

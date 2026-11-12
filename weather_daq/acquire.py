@@ -55,9 +55,22 @@ def _request_stop(signum, _frame):
     _stop.set()
 
 
+def reading_timestamp():
+    """Timezone-aware 'now', deliberately NOT truncated to whole seconds.
+
+    ERA MARKER - do not strip the microseconds. Rows written before 2026-11-13
+    have whole-second timestamps AND are 5h30m too late (naive IST stored as
+    UTC). Every row written since has a non-zero microsecond part (bumped to 1
+    if it lands on exactly 0) and a true timestamp. `microseconds % 1000000 = 0`
+    therefore selects the legacy rows exactly - see system/db/fix_timestamp_offset.sql.
+    """
+    now = datetime.now().astimezone()
+    return now.replace(microsecond=1) if now.microsecond == 0 else now
+
+
 def read_sensors(dht, arduino, cpu):
     """Build one reading. Each sensor failure degrades to None, never raises."""
-    rec = WeatherRecord(timestamp=datetime.now().astimezone().replace(microsecond=0))
+    rec = WeatherRecord(timestamp=reading_timestamp())
 
     try:
         rec.temp, rec.rh = dht.read_values()
