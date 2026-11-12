@@ -5,6 +5,12 @@ import board
 ACQUIRE_INTERVAL = 60    # seconds between readings
 FLUSH_BATCH = 500        # max spooled readings pushed to TimescaleDB per cycle
 
+# Temperature/humidity sensor: 'dht22' (default) or 'sht45' (any Sensirion SHT4x, I2C).
+# For 'sht45': `pip install adafruit-circuitpython-sht4x==1.0.27` in the DAQ venv, wire it to
+# the Pi's I2C pins (see sht4x_sensor.py), then set TEMP_SENSOR and restart weather_daq.
+TEMP_SENSOR = 'dht22'
+SHT4X_I2C_ADDR = 0x44
+
 DHT_PIN = board.D4
 DHT_RETRY_COUNT = 3
 DHT_RECOVERY_INTERVAL = 3
