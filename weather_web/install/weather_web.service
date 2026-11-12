@@ -14,8 +14,11 @@ Environment="PATH=/home/klm/weather/weather_web/.venv-web/bin"
 Environment="WEATHER_STATUS_FILE=/tmp/weather_current.json"
 # Loopback only: the page is reached through nginx (which the Cloudflare
 # Tunnel and the LAN talk to), never directly on port 8000.
+# ProtectSystem=strict makes /tmp read-only, and gunicorn needs a writable
+# directory for its worker heartbeat files: use the private in-memory /dev/shm.
+Environment="TMPDIR=/dev/shm"
 ExecStart=/home/klm/weather/weather_web/.venv-web/bin/gunicorn --workers 2 --bind 127.0.0.1:8000 \
-    --timeout 30 --graceful-timeout 20 --max-requests 2000 --max-requests-jitter 200 \
+    --worker-tmp-dir /dev/shm --timeout 30 --graceful-timeout 20 --max-requests 2000 --max-requests-jitter 200 \
     --limit-request-line 2048 --limit-request-fields 50 --limit-request-field_size 4094 app:app
 Restart=always
 RestartSec=10
