@@ -128,3 +128,50 @@ install Grafana, add a Postgres data source pointing at TimescaleDB (`localhost:
 Grafana runs on the same box), then build panels for temp/rh/wind/rain/lightning. Remember: DB
 stores wind direction as the direction the wind blows *toward* (non-standard) - label panels
 accordingly, don't invert.
+
+## Public access via Cloudflare Tunnel (hardened 2026-11-12)
+
+The weather page is public-facing, so the Pi itself is never exposed:
+
+```
+visitor -> Cloudflare (TLS, DDoS, WAF) -> cloudflared (OUTBOUND tunnel from the Pi)
+        -> nginx :80 (rate limits, headers) -> gunicorn 127.0.0.1:8000 -> TimescaleDB (read-only)
+```
+
+- **No router port-forward.** Nothing listens to the internet. `ufw` allows 22/80/5353 from the LAN only.
+- gunicorn binds `127.0.0.1` and runs in a systemd sandbox; nginx is the only way in.
+- The page caches for 30 s and serves the last good copy for 10 min if the DB is down, so visitor
+  traffic never turns into DB load. History is limited to the last 31 days; error detail is never shown.
+- OS hardening (ufw, fail2ban, sshd, security-only unattended-upgrades at 02:30) is `system/harden.sh`,
+  run once with `sudo bash system/harden.sh`. It arms a 5-minute firewall rollback timer; open a NEW ssh
+  session to confirm, then `sudo systemctl stop weather-ufw-rollback.timer`.
+- `release.bat`/`upload.bat` still use SSH **password** login. Move them to a key, then set
+  `PasswordAuthentication no` in `/etc/ssh/sshd_config.d/10-weather-hardening.conf`.
+
+### Creating the tunnel (needs your Cloudflare account - done by hand, the token is a secret)
+
+1. On the Pi: `sudo bash system/install-cloudflared.sh` (installs the program only).
+2. Cloudflare dashboard -> Zero Trust -> Networks -> Tunnels -> Create a tunnel (Cloudflared).
+   Name it `weather-station`; copy the install token.
+3. Add a **Public hostname**: your hostname (e.g. `weather.example.com`) -> Service `HTTP` -> `localhost:80`.
+4. On the Pi, run yourself (the token is a credential - keep it out of chat/logs):
+   `sudo cloudflared service install <TOKEN>` - it enables the service at boot.
+5. Cloudflare -> that domain: SSL/TLS "Full", enable "Always Use HTTPS" and HSTS, and add a WAF
+   rate-limiting rule (e.g. 60 requests/min per IP). The Pi's daily reboot restores the tunnel
+   automatically because the service is enabled.
+
+### Read-only database role for the web page (needs a DB admin on the TimescaleDB host)
+
+`weather_web/web_settings.py` currently reuses the DAQ's write login. Replace it with:
+
+```sql
+CREATE ROLE weather_ro LOGIN PASSWORD '...' CONNECTION LIMIT 10;
+GRANT CONNECT ON DATABASE iiot TO weather_ro;
+GRANT USAGE ON SCHEMA public TO weather_ro;
+GRANT SELECT ON weather TO weather_ro;
+ALTER ROLE weather_ro SET statement_timeout = '8s';
+ALTER ROLE weather_ro SET default_transaction_read_only = on;
+```
+
+While there, the DAQ role is insert-only so `weather_timestamp_key` was never created (re-sent batches
+are not deduplicated). As the table owner: `CREATE UNIQUE INDEX IF NOT EXISTS weather_timestamp_key ON weather (timestamp);`

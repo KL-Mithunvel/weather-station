@@ -2,6 +2,9 @@
 Description=Weather station data acquisition
 After=network-online.target
 Wants=network-online.target
+# Never give up restarting - the station is unattended. (Belongs in [Unit];
+# in [Service] systemd ignores it with a warning.)
+StartLimitIntervalSec=0
 
 [Service]
 User=klm
@@ -22,8 +25,6 @@ Environment=PYTHONUNBUFFERED=1
 # died, so always bring it back.
 Restart=always
 RestartSec=10
-# Never give up restarting - the station is unattended.
-StartLimitIntervalSec=0
 
 [Install]
 WantedBy=multi-user.target

@@ -48,6 +48,11 @@ sensors -> weather_daq -> spool (sqlite) -> TimescaleDB -> Grafana (history/grap
   `weather_web/example_settings.py` - copy to `web_settings.py` (gitignored) and fill in the same
   Postgres/TimescaleDB `DB_SETTINGS` as the DAQ (a read-only DB role is a reasonable hardening step,
   not yet done).
+- **Public exposure (read before touching `weather_web`/nginx/units):** the page is reached by the public
+  only through a Cloudflare Tunnel -> nginx -> gunicorn bound to `127.0.0.1`. Never bind gunicorn or Flask to
+  `0.0.0.0`, never forward a router port, never show raw DB/sensor error text, never add unbounded queries or
+  write endpoints. `weather_web.service` is sandboxed (no `PrivateTmp`: the status file is in `/tmp`).
+  OS hardening lives in `system/harden.sh`; the setup runbook is in `weather.MD`.
 - **`arduino UNO/DAQ.ino`** - prints `windDir,windSpeed,totalRainfall` CSV at 115200 baud once a
   second. Holds the per-vane ADC calibration table.
 - **`system/`** - Pi-level resilience, installed by `spanner/deploy.sh` (not part of either app):

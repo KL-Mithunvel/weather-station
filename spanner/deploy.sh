@@ -99,6 +99,22 @@ if ! cmp -s system/weather-watchdog.conf "$WATCHDOG_CONF"; then
     sudo install -D -m 644 -o root -g root system/weather-watchdog.conf "$WATCHDOG_CONF"
 fi
 
+# nginx site. Validated before the reload and rolled back if nginx rejects it,
+# so a bad edit can never take the page down.
+NGINX_SITE="${NGINX_SITE:-/etc/nginx/sites-available/weather_web}"
+if [ -d "$(dirname "$NGINX_SITE")" ] && ! cmp -s weather_web/install/weather_web.nginx "$NGINX_SITE"; then
+    echo "Installing nginx site $NGINX_SITE..."
+    sudo cp "$NGINX_SITE" "$NGINX_SITE.prev" 2>/dev/null || true
+    sudo install -m 644 -o root -g root weather_web/install/weather_web.nginx "$NGINX_SITE"
+    if sudo nginx -t; then
+        sudo systemctl reload nginx
+    else
+        echo "ERROR: nginx rejected the new site config; restoring the previous one."
+        [ -f "$NGINX_SITE.prev" ] && sudo cp "$NGINX_SITE.prev" "$NGINX_SITE"
+        exit 1
+    fi
+fi
+
 echo "Restarting services..."
 sudo systemctl restart weather_daq weather_web
 sleep 3

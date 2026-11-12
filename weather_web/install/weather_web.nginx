@@ -1,12 +1,66 @@
+# Public-facing reverse proxy for the weather page.
+#
+# Traffic path: visitor -> Cloudflare -> cloudflared (outbound tunnel from the
+# Pi) -> this nginx on port 80 -> gunicorn on 127.0.0.1:8000. No port is
+# forwarded to the Pi. ufw limits port 80 to the LAN, so the tunnel (which
+# connects from localhost) and LAN browsers are the only clients.
+#
+# This file is included inside nginx's http{} block, so the zone and map
+# directives below are valid at top level.
+
+limit_req_zone  $binary_remote_addr zone=weather_req:10m  rate=5r/s;
+limit_conn_zone $binary_remote_addr zone=weather_conn:10m;
+
+# Trust the scheme Cloudflare saw (the tunnel itself speaks plain HTTP to us).
+map $http_x_forwarded_proto $weather_proto {
+    default $scheme;
+    https   https;
+}
+
 server {
-    listen 80;
+    listen 80 default_server;
+    listen [::]:80 default_server;
     server_name _;
-    
+
+    server_tokens off;
+
+    # The real visitor address, from the header Cloudflare sets. Only honoured
+    # when the hop is cloudflared on localhost; a LAN client cannot spoof it.
+    set_real_ip_from 127.0.0.1;
+    set_real_ip_from ::1;
+    real_ip_header CF-Connecting-IP;
+
+    # Cheap protection against slow-loris and oversized requests.
+    client_max_body_size      1k;
+    client_body_timeout       10s;
+    client_header_timeout     10s;
+    send_timeout              15s;
+    keepalive_timeout         15s;
+    large_client_header_buffers 4 8k;
+
+    # Per-visitor limits (the page is cached, so real use is far below this).
+    limit_req    zone=weather_req burst=20 nodelay;
+    limit_req_status 429;
+    limit_conn   weather_conn 20;
+    limit_conn_status 429;
+
+    # Read-only site.
+    if ($request_method !~ ^(GET|HEAD)$) {
+        return 405;
+    }
+
     location / {
         proxy_pass http://127.0.0.1:8000;
+        proxy_http_version 1.1;
+        proxy_connect_timeout 5s;
+        proxy_read_timeout    30s;
+        proxy_set_header Connection "";
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
+        # $remote_addr (not $proxy_add_x_forwarded_for) so a client-supplied
+        # X-Forwarded-For is never passed on.
+        proxy_set_header X-Forwarded-For $remote_addr;
+        proxy_set_header X-Forwarded-Proto $weather_proto;
+        proxy_hide_header X-Powered-By;
     }
 }

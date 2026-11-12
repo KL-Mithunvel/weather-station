@@ -1,16 +1,26 @@
 """Read-only query layer for the weather_web table page.
 
 Queries TimescaleDB directly - it is the only durable store weather_daq
-writes to now (see weather_daq/WeatherTimeScaleDB.py). There is no local
-history database on the web side any more; the old sqlite-backed db_api.py
-was removed when the project was pruned to a DAQ -> TimescaleDB -> Grafana
-pipeline, and this module restores the old table-page query surface on top
-of that pipeline instead of resurrecting sqlite.
+writes to (see weather_daq/WeatherTimeScaleDB.py). There is no local history
+database on the web side.
+
+Defence in depth for a public-facing page: every session is opened read-only
+and with a statement timeout, and the date filters are range comparisons so
+TimescaleDB can skip chunks instead of scanning the whole table. The real
+boundary is the database role - give web_settings.DB_SETTINGS a role that only
+has SELECT on `weather` (see weather.MD).
 """
 
 import psycopg2
 
 COLS = ['timestamp', 'temp', 'rh', 'cpu_temp', 'wind_speed', 'wind_dir', 'rain_qty']
+
+# Applied to every web session.
+SESSION_OPTIONS = '-c default_transaction_read_only=on -c statement_timeout=8000 -c idle_in_transaction_session_timeout=10000'
+
+# `timestamp >= day AND timestamp < day + 1` selects the same rows as
+# `timestamp::date = day` but lets the planner prune chunks.
+DAY_FILTER = "timestamp >= %(d)s::date AND timestamp < (%(d)s::date + 1)"
 
 
 class WeatherDB:
@@ -23,6 +33,8 @@ class WeatherDB:
             "user": db_settings.get("DB_USER", "weather"),
             "password": db_settings.get("DB_PASSWORD", ""),
             "connect_timeout": 5,
+            "options": SESSION_OPTIONS,
+            "application_name": "weather_web",
         }
         self.connection = None
         self.connect()
@@ -44,14 +56,14 @@ class WeatherDB:
         self.check_connection()
         with self.connection.cursor() as cur:
             cur.execute(
-                f"SELECT {', '.join(COLS)} FROM weather WHERE timestamp::date = %s::date ORDER BY timestamp",
-                (dt,),
+                f"SELECT {', '.join(COLS)} FROM weather WHERE {DAY_FILTER} ORDER BY timestamp",
+                {"d": dt},
             )
             return cur.fetchall()
 
     def get_daily_summary(self, dt):
         self.check_connection()
-        calc_query = """
+        calc_query = f"""
             SELECT
                 MIN(temp) AS min_temp,
                 MAX(temp) AS max_temp,
@@ -67,10 +79,10 @@ class WeatherDB:
                 MAX(cpu_temp) AS max_cpu_temp,
                 AVG(cpu_temp) AS avg_cpu_temp
             FROM weather
-            WHERE timestamp::date = %s::date
+            WHERE {DAY_FILTER}
         """
         with self.connection.cursor() as cur:
-            cur.execute(calc_query, (dt,))
+            cur.execute(calc_query, {"d": dt})
             stats = cur.fetchone()
         return {
             "date": dt,
