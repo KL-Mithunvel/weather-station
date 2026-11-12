@@ -194,3 +194,45 @@ naive IST wall-clock times and the UTC database session labelled them UTC, so ev
   2026-11-13 is 5h30m late, 2026-11-12 20:25 UTC to 2026-11-13 01:55 UTC holds both eras, and the web page
   should keep `DB_TIMEZONE` unset (set `'Asia/Kolkata'` only after the correction).
 - `settings.DB_WRITES_ENABLED = False` still pauses uploads (spool keeps filling) if ever needed.
+
+## Temperature / humidity sensor replacement (researched 2026-11-13, undecided)
+
+The DHT22 logs "sensor not found, check wiring" continuously (checked 2026-11-12/13; may be wiring, may be a
+dead sensor - not yet inspected on the Pi). It is also a poor outdoor choice: its polymer element does not
+tolerate long periods near 100% RH (users report readings stuck near 99%) and it reads 5-15% RH high against
+references. Evidence below is from vendor pages and forum posts; **no manufacturer outdoor-lifespan figures were
+found for any option** - treat "better than a DHT22", not "proven life".
+
+| Option | Typical accuracy | Interface | Notes |
+|---|---|---|---|
+| **Sensirion SHT45, PTFE-membrane variant** (preferred) | +-0.1 C, +-1% RH | I2C | Datasheet lists PTFE membrane + removable cover. Adafruit's SHT45 board uses the PTFE variant. |
+| SHT31 / SHT40 | +-0.2 C, +-2% RH (SHT31) | I2C | Cheaper, less accurate, slower response. |
+| BME280 | +-1 C, +-3% RH | I2C | Adds barometric pressure; weaker on humidity. |
+| RS485 Modbus sensor (Thermokon WSA, Stromquist 22UTH-550X; cheap SHT20-RS485 modules are not weatherproof) | varies | RS485 | Sealed, works over long cables. Needs an RS485 adapter and the register map. |
+
+Decision inputs still needed: **which sensor**, and **cable length** from the sensor to the Pi / Arduino.
+I2C is only reliable to ~1 m; beyond that use RS485, or wire the sensor to the Arduino and add its readings to
+the serial CSV line (changes `DAQ.ino`, `arduino_serial.py`, the DB schema, `records.WEATHER_FIELDS`, the
+spool and the web page - see "Database schema" in `.claude/CLAUDE.md`).
+
+Whatever is chosen: use a Stevenson-style **radiation shield** (direct sun is the biggest error source), keep
+the sensor from sitting wet (coated PCB, PTFE membrane), and add a separate pressure sensor later if wanted
+(the SHT45 has none).
+
+India sourcing seen 2026-11-13 (not verified beyond search snippets): bare SHT45 chip ~Rs 425-860 (Hubtronics,
+Lioncircuits, Tanotis, Robu); 7Semi SHT45 probe ~Rs 1,100-2,000 (Robocraze, Evelta; porous steel housing, not
+PTFE). The PTFE Adafruit board was not found in an Indian listing.
+
+Sources: Sensirion SHT4x datasheet (sensirion.com/resource/datasheet/sht4x); esp32.co.uk SHT31/SHT40/SHT45
+comparison; Arduino, Core Electronics and Node-RED forum threads on outdoor/DHT22 humidity problems;
+hackaday.com/2026/04/29/how-to-kill-humidity-sensors-with-humidity; Thermokon and Stromquist product pages.
+
+## Open items (as of 2026-11-13)
+
+1. **Cloudflare tunnel** - `cloudflared` installed on the Pi, no tunnel yet. Steps are in "Public access via
+   Cloudflare Tunnel". Needs the user's Cloudflare account + hostname; the token step is run by the user.
+2. **Legacy timestamps** - run `system/db/fix_timestamp_offset.sql` once (DB owner); then set `DB_TIMEZONE`.
+3. **Read-only DB role** for `weather_web` (SQL above), then swap `web_settings.py` credentials.
+4. **SSH key for release.bat/upload.bat**, then set `PasswordAuthentication no`.
+5. **DHT22 / replacement sensor** - decide per the table above.
+6. Unique index `weather_timestamp_key` (needs the table owner).
