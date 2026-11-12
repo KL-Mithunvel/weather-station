@@ -41,4 +41,20 @@ real 03:30 reboot, and leave a clear log for review in the morning.
 
 ## Morning report
 
-(filled in at the end of the run)
+### 03:30 reboot verification (checked 03:50 IST) - all passed
+- Reboot ran on schedule (03:30:04), clean shutdown, Pi back up 03:30:16; DAQ booting 03:30:14, Arduino open on /dev/ttyACM0, DB connected.
+- ufw active with only the LAN rules, kernel INPUT policy DROP after boot; listeners 22, 80 and 127.0.0.1:8000 only.
+- Hardware watchdog active (10 s runtime, 3 min reboot); no failed units; clock synced; 52 C, throttled=0x0.
+- Spool pending 0, DB receiving rows; no gap larger than 73 s in the last 3 h, so reboot downtime was under that.
+- Page HTTP 200 with security headers; from the PC only ports 22 and 80 are open.
+- Known and expected: DHT22 reports fault (worn out, replacement pending); cloudflared inactive (no tunnel yet).
+
+### Needs you or the DB owner
+1. Cloudflare tunnel: account/hostname/token, then run `sudo cloudflared service install <TOKEN>` (runbook in weather.MD).
+2. DB owner: run `system/db/fix_timestamp_offset.sql`, then set `DB_TIMEZONE` in the Pi's web_settings.py.
+3. DB owner: create the read-only `weather_ro` role and the unique index `weather_timestamp_key`.
+4. Move release.bat/upload.bat to SSH key auth, then disable SSH password login.
+5. Pick the replacement sensor (SHT45 suggested) and bench-test the untested SHT4x driver.
+
+### Files left on the Pi
+`/tmp/*` leftovers were cleared by the reboot. `/etc/nginx/sites-available/weather_web.prev` (nginx rollback backup) remains.
