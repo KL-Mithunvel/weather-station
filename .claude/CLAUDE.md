@@ -120,7 +120,7 @@ cd weather_web && python -m venv .venv && .venv/bin/pip install -r requirements.
 WEATHER_STATUS_FILE=/tmp/weather_current.json .venv/bin/python app.py    # :8000
 ```
 
-There is no automated test suite. `dht_sensor.py` and `pi_cpu_temp.py` have `__main__` blocks for
+`python tests/run_all.py` runs 78 hardware-free checks (web app, timestamps/era marker, missing values, sensor drivers; needs only `flask` + `psycopg2-binary`) - run it before every release. It does not replace checking on the Pi. `dht_sensor.py` and `pi_cpu_temp.py` have `__main__` blocks for
 manual hardware checks on the Pi.
 
 ## Deployment

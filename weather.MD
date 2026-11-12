@@ -236,3 +236,22 @@ hackaday.com/2026/04/29/how-to-kill-humidity-sensors-with-humidity; Thermokon an
 4. **SSH key for release.bat/upload.bat**, then set `PasswordAuthentication no`.
 5. **DHT22 / replacement sensor** - decide per the table above.
 6. Unique index `weather_timestamp_key` (needs the table owner).
+
+## Status after the 2026-11-13 overnight run
+
+- **DHT22 is dead, not misconfigured.** From the database: 2025-06..2026-04 ~0% readings without a temperature;
+  2026-05 11.9% missing (intermittent); from 2026-06-03 100% missing. A slide from flaky to dead over ~5 weeks
+  at the start of the humid season points to sensor/connector wear, not software. Replace the sensor; also
+  inspect the connector/cable for corrosion.
+- **Switching sensors is now a settings change.** `weather_daq/sht4x_sensor.py` is a drop-in SHT4x (SHT40/45)
+  driver, selected with `TEMP_SENSOR = 'sht45'` (default `'dht22'`, production unchanged). To switch: wire it to
+  the Pi I2C pins (3V3, GND, SDA=GPIO2/pin 3, SCL=GPIO3/pin 5, cable < ~1 m), `pip install
+  adafruit-circuitpython-sht4x==1.0.27` in `.venv-daq`, set `TEMP_SENSOR`, restart `weather_daq`, and try
+  `python weather_daq/sht4x_sensor.py` first. Status key becomes `temp_rh`; the web page already labels it.
+  Not tested on real hardware (only against a fake I2C layer) - first run on the bench.
+- Missing readings display as "-" on the web page and as `null` in the API summary (previously "None"/"0").
+- `weather_daq/requirements.txt` is now UTF-8 with `psycopg2-binary` (it was UTF-16 + source `psycopg2`, which
+  cannot build on the Pi). Verified with a pip dry-run against the live venv.
+- `DAQ.ino` compiles from the repo as committed (stray backticks removed); firmware is byte-identical to what
+  is on the Arduino.
+- Tests: `python tests/run_all.py`.
